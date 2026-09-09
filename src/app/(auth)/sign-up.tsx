@@ -14,6 +14,8 @@ import {
   View,
 } from "react-native";
 
+import kribbLogo from "../../../assets/images/kribb.png";
+
 type FormErrors = {
   firstName?: string;
   lastName?: string;
@@ -58,8 +60,8 @@ const SignUp = () => {
 
     if (!password) {
       newErrors.password = "Password is required";
-    } else if (password.length < 8) {
-      newErrors.password = "Password must be at least 8 characters";
+    } else if (password.length < 15) {
+      newErrors.password = "Password must be at least 15 characters";
     }
 
     setErrors(newErrors);
@@ -205,7 +207,7 @@ const SignUp = () => {
         >
           <View className="flex-1 justify-center px-5 py-10">
             <Image
-              source={require("../../../assets/images/kribb.png")}
+              source={kribbLogo}
               className="h-20 w-28"
               resizeMode="contain"
             />
