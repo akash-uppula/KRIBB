@@ -1,6 +1,6 @@
 import { useAuth, useUser } from "@clerk/expo";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -10,9 +10,13 @@ import {
   View,
 } from "react-native";
 
+import { useSupabase } from "../../../../hooks/useSupabase";
+
 const Profile = () => {
   const { signOut } = useAuth();
   const { user } = useUser();
+
+  const supabase = useSupabase();
 
   const [isSigningOut, setIsSigningOut] = useState(false);
 
@@ -23,6 +27,65 @@ const Profile = () => {
   const initials =
     `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || "U";
 
+  // Sync Clerk user with Supabase
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    const syncProfile = async () => {
+      // Check if profile already exists
+      const { data: existingProfile, error: fetchError } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("clerk_user_id", user.id)
+        .maybeSingle();
+
+      if (fetchError) {
+        console.log("Profile check error:", fetchError.message);
+        return;
+      }
+
+      // Create profile if it doesn't exist
+      if (!existingProfile) {
+        const { error: insertError } = await supabase.from("profiles").insert({
+          clerk_user_id: user.id,
+          first_name: user.firstName ?? "",
+          last_name: user.lastName ?? "",
+          email: user.primaryEmailAddress?.emailAddress ?? "",
+        });
+
+        if (insertError) {
+          console.log("Profile creation error:", insertError.message);
+          return;
+        }
+
+        console.log("Profile created successfully");
+        return;
+      }
+
+      // Update existing profile
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({
+          first_name: user.firstName ?? "",
+          last_name: user.lastName ?? "",
+          email: user.primaryEmailAddress?.emailAddress ?? "",
+        })
+        .eq("clerk_user_id", user.id);
+
+      if (updateError) {
+        console.log("Profile update error:", updateError.message);
+        return;
+      }
+
+      console.log("Profile synced successfully");
+    };
+
+    syncProfile();
+  }, [user, supabase]);
+
+  // Sign out
   const handleSignOut = async () => {
     setIsSigningOut(true);
 
@@ -37,6 +100,7 @@ const Profile = () => {
     }
   };
 
+  // Back to Home
   const handleBackToHome = () => {
     router.replace("/(root)/(tabs)");
   };
