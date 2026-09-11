@@ -33,6 +33,20 @@ const TabsLayout = () => {
       />
 
       <Tabs.Screen
+        name="add-property"
+        options={{
+          title: "Add Property",
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons
+              name={focused ? "add" : "add-outline"}
+              size={size}
+              color={color}
+            />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
         name="saved"
         options={{
           title: "Saved",
