@@ -1,9 +1,13 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useUser } from "@clerk/expo";
 import { router } from "expo-router";
+import { File } from "expo-file-system";
 import { useState } from "react";
+import * as ImagePicker from "expo-image-picker";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Pressable,
   ScrollView,
   Switch,
@@ -18,6 +22,10 @@ const AddProperty = () => {
   const { user } = useUser();
   const supabase = useSupabase();
 
+  // --------------------------------
+  // Form state
+  // --------------------------------
+
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
@@ -31,7 +39,70 @@ const AddProperty = () => {
   const [longitude, setLongitude] = useState("");
   const [isSold, setIsSold] = useState(false);
 
+  // --------------------------------
+  // Image state
+  // --------------------------------
+
+  const [images, setImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
+
+  // --------------------------------
+  // Loading state
+  // --------------------------------
+
   const [isSaving, setIsSaving] = useState(false);
+
+  // --------------------------------
+  // Pick images
+  // --------------------------------
+
+  const pickImages = async () => {
+    if (images.length >= 5) {
+      Alert.alert("Image Limit", "You can select a maximum of 5 images.");
+      return;
+    }
+
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      Alert.alert(
+        "Permission Required",
+        "Please allow photo library access to select property images.",
+      );
+      return;
+    }
+
+    const remainingSlots = 5 - images.length;
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsMultipleSelection: true,
+      selectionLimit: remainingSlots,
+      quality: 0.8,
+    });
+
+    if (result.canceled) {
+      return;
+    }
+
+    setImages((currentImages) => [
+      ...currentImages,
+      ...result.assets.slice(0, remainingSlots),
+    ]);
+  };
+
+  // --------------------------------
+  // Remove image
+  // --------------------------------
+
+  const removeImage = (index: number) => {
+    setImages((currentImages) =>
+      currentImages.filter((_, imageIndex) => imageIndex !== index),
+    );
+  };
+
+  // --------------------------------
+  // Reset form
+  // --------------------------------
 
   const resetForm = () => {
     setTitle("");
@@ -46,7 +117,101 @@ const AddProperty = () => {
     setLatitude("");
     setLongitude("");
     setIsSold(false);
+    setImages([]);
   };
+
+  // --------------------------------
+  // Upload images
+  // --------------------------------
+
+  const uploadImages = async (propertyId: string): Promise<string[]> => {
+    if (!user || images.length === 0) {
+      return [];
+    }
+
+    const uploadedUrls: string[] = [];
+
+    for (let index = 0; index < images.length; index++) {
+      const image = images[index];
+
+      console.log("Uploading image:", image.uri);
+
+      // --------------------------------
+      // Read image from phone
+      // --------------------------------
+
+      const file = new File(image.uri);
+
+      const arrayBuffer = await file.arrayBuffer();
+
+      console.log("Image read successfully:", arrayBuffer.byteLength, "bytes");
+
+      // --------------------------------
+      // Get image type
+      // --------------------------------
+
+      const mimeType = image.mimeType ?? "image/jpeg";
+
+      let extension = "jpg";
+
+      if (mimeType === "image/png") {
+        extension = "png";
+      } else if (mimeType === "image/webp") {
+        extension = "webp";
+      } else if (mimeType === "image/heic") {
+        extension = "heic";
+      } else if (mimeType === "image/heif") {
+        extension = "heif";
+      } else if (mimeType === "image/jpeg") {
+        extension = "jpg";
+      }
+
+      // --------------------------------
+      // Storage path
+      // --------------------------------
+
+      const filePath = `${user.id}/${propertyId}/image-${index + 1}.${extension}`;
+
+      console.log("Uploading to Supabase:", filePath);
+
+      // --------------------------------
+      // Upload to Supabase Storage
+      // --------------------------------
+
+      const { error: uploadError } = await supabase.storage
+        .from("property-images")
+        .upload(filePath, arrayBuffer, {
+          contentType: mimeType,
+          upsert: true,
+        });
+
+      if (uploadError) {
+        console.log("Supabase image upload error:", uploadError);
+
+        throw new Error(`Image upload failed: ${uploadError.message}`);
+      }
+
+      // --------------------------------
+      // Get public URL
+      // --------------------------------
+
+      const { data: publicUrlData } = supabase.storage
+        .from("property-images")
+        .getPublicUrl(filePath);
+
+      const publicUrl = publicUrlData.publicUrl;
+
+      console.log("Image uploaded successfully:", publicUrl);
+
+      uploadedUrls.push(publicUrl);
+    }
+
+    return uploadedUrls;
+  };
+
+  // --------------------------------
+  // Add property
+  // --------------------------------
 
   const handleAddProperty = async () => {
     if (!user) {
@@ -54,7 +219,11 @@ const AddProperty = () => {
       return;
     }
 
-    if (!title || !price || !address || !city) {
+    // --------------------------------
+    // Required fields
+    // --------------------------------
+
+    if (!title.trim() || !price.trim() || !address.trim() || !city.trim()) {
       Alert.alert(
         "Missing Information",
         "Please fill in the title, price, address, and city.",
@@ -62,10 +231,18 @@ const AddProperty = () => {
       return;
     }
 
-    if (Number.isNaN(Number(price))) {
+    // --------------------------------
+    // Price validation
+    // --------------------------------
+
+    if (Number.isNaN(Number(price)) || Number(price) <= 0) {
       Alert.alert("Invalid Price", "Please enter a valid price.");
       return;
     }
+
+    // --------------------------------
+    // Bedroom validation
+    // --------------------------------
 
     if (Number.isNaN(Number(bedrooms)) || Number(bedrooms) < 1) {
       Alert.alert(
@@ -75,6 +252,10 @@ const AddProperty = () => {
       return;
     }
 
+    // --------------------------------
+    // Bathroom validation
+    // --------------------------------
+
     if (Number.isNaN(Number(bathrooms)) || Number(bathrooms) < 1) {
       Alert.alert(
         "Invalid Bathrooms",
@@ -83,15 +264,27 @@ const AddProperty = () => {
       return;
     }
 
-    if (areaSqft && Number.isNaN(Number(areaSqft))) {
+    // --------------------------------
+    // Area validation
+    // --------------------------------
+
+    if (areaSqft && (Number.isNaN(Number(areaSqft)) || Number(areaSqft) <= 0)) {
       Alert.alert("Invalid Area", "Please enter a valid area.");
       return;
     }
+
+    // --------------------------------
+    // Latitude validation
+    // --------------------------------
 
     if (latitude && Number.isNaN(Number(latitude))) {
       Alert.alert("Invalid Latitude", "Please enter a valid latitude.");
       return;
     }
+
+    // --------------------------------
+    // Longitude validation
+    // --------------------------------
 
     if (longitude && Number.isNaN(Number(longitude))) {
       Alert.alert("Invalid Longitude", "Please enter a valid longitude.");
@@ -101,12 +294,17 @@ const AddProperty = () => {
     setIsSaving(true);
 
     try {
+      // --------------------------------
+      // 1. Create property
+      // --------------------------------
+
       const { data, error } = await supabase
         .from("properties")
         .insert({
           clerk_user_id: user.id,
 
           title: title.trim(),
+
           description: description.trim() || null,
 
           price: Number(price),
@@ -114,19 +312,26 @@ const AddProperty = () => {
           type,
 
           bedrooms: Number(bedrooms),
+
           bathrooms: Number(bathrooms),
 
           area_sqft: areaSqft ? Number(areaSqft) : null,
 
           address: address.trim(),
+
           city: city.trim(),
 
           latitude: latitude ? Number(latitude) : null,
+
           longitude: longitude ? Number(longitude) : null,
 
+          // Images are uploaded after
+          // receiving the property ID.
           images: [],
 
+          // User cannot control featured status.
           is_featured: false,
+
           is_sold: isSold,
         })
         .select()
@@ -142,6 +347,47 @@ const AddProperty = () => {
 
       console.log("Property created:", data);
 
+      // --------------------------------
+      // 2. Upload images
+      // --------------------------------
+
+      if (images.length > 0) {
+        const imageUrls = await uploadImages(data.id);
+
+        console.log("All images uploaded:", imageUrls);
+
+        // --------------------------------
+        // 3. Save URLs to property
+        // --------------------------------
+
+        const { error: imageUpdateError } = await supabase
+          .from("properties")
+          .update({
+            images: imageUrls,
+          })
+          .eq("id", data.id);
+
+        if (imageUpdateError) {
+          console.log(
+            "Update property images error:",
+            imageUpdateError.message,
+          );
+
+          Alert.alert(
+            "Property Added",
+            "The property was created, but the images could not be saved.",
+          );
+
+          resetForm();
+
+          return;
+        }
+      }
+
+      // --------------------------------
+      // 4. Success
+      // --------------------------------
+
       resetForm();
 
       Alert.alert("Success", "Property added successfully!", [
@@ -151,13 +397,19 @@ const AddProperty = () => {
         },
       ]);
     } catch (error) {
-      console.log("Unexpected error:", error);
+      console.log("Unexpected add property error:", error);
 
-      Alert.alert("Error", "Something went wrong while adding the property.");
+      const message = error instanceof Error ? error.message : String(error);
+
+      Alert.alert("Error", message);
     } finally {
       setIsSaving(false);
     }
   };
+
+  // --------------------------------
+  // UI
+  // --------------------------------
 
   return (
     <ScrollView
@@ -360,14 +612,69 @@ const AddProperty = () => {
 
       {/* Images */}
 
-      <View className="mt-5 rounded-xl border border-dashed border-slate-300 p-4">
-        <Text className="text-sm font-semibold text-slate-700">
+      <View className="mt-5">
+        <Text className="mb-2 text-sm font-semibold text-slate-700">
           Property Images
         </Text>
 
-        <Text className="mt-1 text-sm text-slate-500">
-          Image upload will be added later using Supabase Storage.
+        <Text className="mb-3 text-xs text-slate-500">
+          Select up to 5 images of your property.
         </Text>
+
+        {/* Selected images */}
+
+        {images.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            className="mb-3"
+          >
+            <View className="flex-row gap-3">
+              {images.map((image, index) => (
+                <View key={`${image.uri}-${index}`} className="relative">
+                  <Image
+                    source={{
+                      uri: image.uri,
+                    }}
+                    className="h-28 w-28 rounded-xl bg-slate-100"
+                    resizeMode="cover"
+                  />
+
+                  {/* Remove image */}
+
+                  <Pressable
+                    onPress={() => removeImage(index)}
+                    className="absolute right-1 top-1 h-7 w-7 items-center justify-center rounded-full bg-black/70"
+                  >
+                    <Text className="text-base font-bold text-white">×</Text>
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          </ScrollView>
+        )}
+
+        {/* Add images */}
+
+        {images.length < 5 && (
+          <Pressable
+            onPress={pickImages}
+            disabled={isSaving}
+            className="h-14 flex-row items-center justify-center rounded-xl border border-dashed border-blue-400 bg-blue-50 active:bg-blue-100"
+          >
+            <Ionicons name="images-outline" size={22} color="#2563EB" />
+
+            <Text className="ml-2 font-semibold text-blue-600">Add Images</Text>
+          </Pressable>
+        )}
+
+        {/* Image count */}
+
+        {images.length > 0 && (
+          <Text className="mt-2 text-xs text-slate-400">
+            {images.length}/5 images selected
+          </Text>
+        )}
       </View>
 
       {/* Sold */}
@@ -408,9 +715,15 @@ const AddProperty = () => {
         disabled={isSaving}
       >
         {isSaving ? (
-          <ActivityIndicator color="#FFFFFF" />
+          <View className="flex-row items-center">
+            <ActivityIndicator color="#FFFFFF" />
+
+            <Text className="ml-2 font-semibold text-white">
+              Adding Property...
+            </Text>
+          </View>
         ) : (
-          <Text className="text-base text-center font-semibold text-white">
+          <Text className="text-center text-base font-semibold text-white">
             Add Property
           </Text>
         )}
@@ -426,7 +739,7 @@ const AddProperty = () => {
         }}
         disabled={isSaving}
       >
-        <Text className="text-base text-center font-semibold text-slate-700">
+        <Text className="text-center text-base font-semibold text-slate-700">
           Cancel
         </Text>
       </Pressable>
