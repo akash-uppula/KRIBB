@@ -19,9 +19,9 @@ const TabsLayout = () => {
       />
 
       <Tabs.Screen
-        name="search"
+        name="properties"
         options={{
-          title: "Search",
+          title: "Explore",
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons
               name={focused ? "search" : "search-outline"}
@@ -35,10 +35,10 @@ const TabsLayout = () => {
       <Tabs.Screen
         name="add-property"
         options={{
-          title: "Add Property",
+          title: "Add",
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons
-              name={focused ? "add" : "add-outline"}
+              name={focused ? "add-circle" : "add-circle-outline"}
               size={size}
               color={color}
             />
