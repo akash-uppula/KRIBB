@@ -33,6 +33,21 @@ const AddProperty = () => {
 
   const [isSaving, setIsSaving] = useState(false);
 
+  const resetForm = () => {
+    setTitle("");
+    setDescription("");
+    setPrice("");
+    setType("apartment");
+    setBedrooms("1");
+    setBathrooms("1");
+    setAreaSqft("");
+    setAddress("");
+    setCity("");
+    setLatitude("");
+    setLongitude("");
+    setIsSold(false);
+  };
+
   const handleAddProperty = async () => {
     if (!user) {
       Alert.alert("Error", "You must be signed in.");
@@ -126,6 +141,8 @@ const AddProperty = () => {
       }
 
       console.log("Property created:", data);
+
+      resetForm();
 
       Alert.alert("Success", "Property added successfully!", [
         {
@@ -403,7 +420,10 @@ const AddProperty = () => {
 
       <Pressable
         className="mt-3 h-14 items-center justify-center rounded-xl border border-slate-300 bg-white"
-        onPress={() => router.back()}
+        onPress={() => {
+          resetForm();
+          router.back();
+        }}
         disabled={isSaving}
       >
         <Text className="text-base text-center font-semibold text-slate-700">
