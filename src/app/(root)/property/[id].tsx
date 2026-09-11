@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useUser } from "@clerk/expo";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
@@ -42,6 +43,9 @@ const PropertyDetails = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const [isSaved, setIsSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
   useEffect(() => {
     const fetchProperty = async () => {
       if (!id) {
@@ -67,6 +71,77 @@ const PropertyDetails = () => {
 
     fetchProperty();
   }, [id, supabase]);
+
+  const checkIfSaved = async () => {
+    if (!id || !user?.id) return;
+
+    const { data, error } = await supabase
+      .from("saved_properties")
+      .select("id")
+      .eq("clerk_user_id", user.id)
+      .eq("property_id", id)
+      .maybeSingle();
+
+    if (error) {
+      console.log("Check saved property error:", error.message);
+      return;
+    }
+
+    setIsSaved(!!data);
+  };
+
+  useEffect(() => {
+    checkIfSaved();
+  }, [id, user?.id, supabase]);
+
+  const toggleSaved = async () => {
+    if (!property || !user?.id || isSaving) return;
+
+    setIsSaving(true);
+
+    try {
+      if (isSaved) {
+        // Remove from saved
+        const { error } = await supabase
+          .from("saved_properties")
+          .delete()
+          .eq("clerk_user_id", user.id)
+          .eq("property_id", property.id);
+
+        if (error) {
+          console.log("Unsave property error:", error.message);
+
+          Alert.alert("Error", "Could not remove this property from saved.");
+
+          return;
+        }
+
+        setIsSaved(false);
+      } else {
+        // Add to saved
+        const { error } = await supabase.from("saved_properties").insert({
+          clerk_user_id: user.id,
+          property_id: property.id,
+        });
+
+        if (error) {
+          console.log("Save property error:", error.message);
+
+          Alert.alert("Error", "Could not save this property.");
+
+          return;
+        }
+
+        setIsSaved(true);
+      }
+    } catch (error) {
+      console.log("Toggle saved error:", error);
+
+      Alert.alert("Error", "Something went wrong. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const formatPrice = (price: number) => {
     return `₹${price.toLocaleString("en-IN")}`;
@@ -209,11 +284,29 @@ const PropertyDetails = () => {
           )}
         </View>
 
-        {/* Title */}
+        {/* Title + Save */}
 
-        <Text className="mt-4 text-2xl font-bold text-slate-900">
-          {property.title}
-        </Text>
+        <View className="mt-4 flex-row items-start justify-between">
+          <Text className="mr-4 flex-1 text-2xl font-bold text-slate-900">
+            {property.title}
+          </Text>
+
+          <Pressable
+            onPress={toggleSaved}
+            disabled={isSaving}
+            className="h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white"
+          >
+            {isSaving ? (
+              <ActivityIndicator size="small" color="#2563EB" />
+            ) : (
+              <Ionicons
+                name={isSaved ? "heart" : "heart-outline"}
+                size={25}
+                color={isSaved ? "#EF4444" : "#64748B"}
+              />
+            )}
+          </Pressable>
+        </View>
 
         {/* Price */}
 
