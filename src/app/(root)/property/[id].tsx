@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useUser } from "@clerk/expo";
-import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
+import { useEffect, useState, useCallback } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -46,31 +46,33 @@ const PropertyDetails = () => {
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
-    const fetchProperty = async () => {
-      if (!id) {
-        setIsLoading(false);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from("properties")
-        .select("*")
-        .eq("id", id)
-        .single();
-
-      if (error) {
-        console.log("Fetch property error:", error.message);
-        setIsLoading(false);
-        return;
-      }
-
-      setProperty(data);
+  const fetchProperty = async () => {
+    if (!id) {
       setIsLoading(false);
-    };
+      return;
+    }
 
-    fetchProperty();
-  }, [id, supabase]);
+    const { data, error } = await supabase
+      .from("properties")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error) {
+      console.log("Fetch property error:", error.message);
+      setIsLoading(false);
+      return;
+    }
+
+    setProperty(data);
+    setIsLoading(false);
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchProperty();
+    }, [id]),
+  );
 
   const checkIfSaved = async () => {
     if (!id || !user?.id) return;

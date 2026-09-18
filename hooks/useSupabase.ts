@@ -1,14 +1,18 @@
 import { useAuth } from "@clerk/expo";
-import { useMemo } from "react";
+import { useRef } from "react";
 
 import { createSupabaseClient } from "../lib/supabase";
 
 export const useSupabase = () => {
   const { getToken } = useAuth();
 
-  const supabase = useMemo(() => {
-    return createSupabaseClient(getToken);
-  }, [getToken]);
+  const supabaseRef = useRef<ReturnType<typeof createSupabaseClient> | null>(
+    null,
+  );
 
-  return supabase;
+  if (!supabaseRef.current) {
+    supabaseRef.current = createSupabaseClient(getToken);
+  }
+
+  return supabaseRef.current;
 };
