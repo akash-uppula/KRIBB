@@ -5,6 +5,7 @@ import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -272,12 +273,22 @@ const Saved = () => {
                   })
                 }
               >
-                {/* Image placeholder */}
+                {/* Property image */}
 
-                <View className="h-44 items-center justify-center bg-slate-100">
-                  <Text className="text-sm font-medium text-slate-400">
-                    Property Image
-                  </Text>
+                <View className="h-44 overflow-hidden bg-slate-100">
+                  {property.images && property.images.length > 0 ? (
+                    <Image
+                      source={{ uri: property.images[0] }}
+                      className="h-full w-full"
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View className="h-full items-center justify-center">
+                      <Text className="text-sm font-medium text-slate-400">
+                        Property Image
+                      </Text>
+                    </View>
+                  )}
 
                   {/* Featured badge */}
 

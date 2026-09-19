@@ -1,10 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useUser } from "@clerk/expo";
-import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
-import { useEffect, useState, useCallback } from "react";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Pressable,
   ScrollView,
   Text,
@@ -40,11 +41,16 @@ const PropertyDetails = () => {
   const supabase = useSupabase();
 
   const [property, setProperty] = useState<Property | null>(null);
+
   const [isLoading, setIsLoading] = useState(true);
+
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [isSaved, setIsSaved] = useState(false);
+
   const [isSaving, setIsSaving] = useState(false);
+
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   const fetchProperty = async () => {
     if (!id) {
@@ -60,11 +66,13 @@ const PropertyDetails = () => {
 
     if (error) {
       console.log("Fetch property error:", error.message);
+
       setIsLoading(false);
       return;
     }
 
     setProperty(data);
+    setCurrentImageIndex(0);
     setIsLoading(false);
   };
 
@@ -75,7 +83,9 @@ const PropertyDetails = () => {
   );
 
   const checkIfSaved = async () => {
-    if (!id || !user?.id) return;
+    if (!id || !user?.id) {
+      return;
+    }
 
     const { data, error } = await supabase
       .from("saved_properties")
@@ -97,13 +107,14 @@ const PropertyDetails = () => {
   }, [id, user?.id, supabase]);
 
   const toggleSaved = async () => {
-    if (!property || !user?.id || isSaving) return;
+    if (!property || !user?.id || isSaving) {
+      return;
+    }
 
     setIsSaving(true);
 
     try {
       if (isSaved) {
-        // Remove from saved
         const { error } = await supabase
           .from("saved_properties")
           .delete()
@@ -120,7 +131,6 @@ const PropertyDetails = () => {
 
         setIsSaved(false);
       } else {
-        // Add to saved
         const { error } = await supabase.from("saved_properties").insert({
           clerk_user_id: user.id,
           property_id: property.id,
@@ -152,7 +162,9 @@ const PropertyDetails = () => {
   const isMyProperty = property !== null && property.clerk_user_id === user?.id;
 
   const handleEdit = () => {
-    if (!property) return;
+    if (!property) {
+      return;
+    }
 
     router.push({
       pathname: "/property/edit",
@@ -163,7 +175,9 @@ const PropertyDetails = () => {
   };
 
   const handleDelete = () => {
-    if (!property) return;
+    if (!property) {
+      return;
+    }
 
     Alert.alert(
       "Delete Property",
@@ -183,7 +197,9 @@ const PropertyDetails = () => {
   };
 
   const deleteProperty = async () => {
-    if (!property) return;
+    if (!property) {
+      return;
+    }
 
     setIsDeleting(true);
 
@@ -243,6 +259,8 @@ const PropertyDetails = () => {
     );
   }
 
+  const propertyImages = property.images ?? [];
+
   return (
     <ScrollView
       className="flex-1 bg-white"
@@ -251,13 +269,66 @@ const PropertyDetails = () => {
         paddingBottom: 40,
       }}
     >
-      {/* Image placeholder */}
+      {/* Image Gallery */}
 
-      <View className="h-64 items-center justify-center bg-slate-100">
-        <Text className="text-sm font-medium text-slate-400">
-          Property Image
-        </Text>
-      </View>
+      {propertyImages.length > 0 ? (
+        <View className="relative">
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={(event) => {
+              const width = event.nativeEvent.layoutMeasurement.width;
+
+              const offset = event.nativeEvent.contentOffset.x;
+
+              const index = Math.round(offset / width);
+
+              setCurrentImageIndex(index);
+            }}
+          >
+            {propertyImages.map((image, index) => (
+              <Image
+                key={`${image}-${index}`}
+                source={{ uri: image }}
+                className="h-64 w-screen bg-slate-100"
+                resizeMode="cover"
+              />
+            ))}
+          </ScrollView>
+
+          {/* Image Counter */}
+
+          <View className="absolute bottom-4 right-4 rounded-full bg-black/70 px-3 py-1.5">
+            <Text className="text-xs font-semibold text-white">
+              {currentImageIndex + 1} / {propertyImages.length}
+            </Text>
+          </View>
+
+          {/* Image Dots */}
+
+          {propertyImages.length > 1 && (
+            <View className="absolute bottom-4 left-0 right-0 flex-row items-center justify-center">
+              {propertyImages.map((_, index) => (
+                <View
+                  key={index}
+                  className={`mx-1 h-2 w-2 rounded-full ${
+                    index === currentImageIndex ? "bg-white" : "bg-white/50"
+                  }`}
+                />
+              ))}
+            </View>
+          )}
+        </View>
+      ) : (
+        <View className="h-64 items-center justify-center bg-slate-100">
+          <Ionicons name="image-outline" size={48} color="#94A3B8" />
+
+          <Text className="mt-2 text-sm font-medium text-slate-400">
+            No images available
+          </Text>
+        </View>
+      )}
 
       <View className="p-5">
         {/* Status */}
@@ -322,7 +393,7 @@ const PropertyDetails = () => {
           {property.address}, {property.city}
         </Text>
 
-        {/* Property summary */}
+        {/* Property Summary */}
 
         <View className="mt-6 flex-row rounded-2xl border border-slate-200 bg-slate-50 p-4">
           <View className="flex-1 items-center">

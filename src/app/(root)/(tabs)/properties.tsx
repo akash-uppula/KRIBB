@@ -3,6 +3,7 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -289,13 +290,21 @@ const Properties = () => {
                   })
                 }
               >
-                {/* Image Placeholder */}
+                {/* Property Image */}
 
-                <View className="h-48 items-center justify-center bg-slate-100">
-                  <Text className="text-sm font-medium text-slate-400">
-                    Property Image
-                  </Text>
-                </View>
+                {property.images && property.images.length > 0 ? (
+                  <Image
+                    source={{ uri: property.images[0] }}
+                    className="h-48 w-full bg-slate-100"
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View className="h-48 items-center justify-center bg-slate-100">
+                    <Text className="text-sm font-medium text-slate-400">
+                      Property Image
+                    </Text>
+                  </View>
+                )}
 
                 {/* Property Information */}
 
