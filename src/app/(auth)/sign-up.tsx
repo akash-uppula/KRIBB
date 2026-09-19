@@ -168,6 +168,20 @@ const SignUp = () => {
     }
   };
 
+  const handleUseDifferentAccount = async () => {
+    try {
+      await signUp.reset();
+    } catch {}
+
+    setIsVerifying(false);
+    setCode("");
+    setErrors({});
+    setFirstName("");
+    setLastName("");
+    setEmail("");
+    setPassword("");
+  };
+
   const handleResendCode = async () => {
     Keyboard.dismiss();
 
@@ -475,6 +489,16 @@ const SignUp = () => {
                       I need a new code
                     </Text>
                   )}
+                </Pressable>
+
+                {/* Use Different Account */}
+                <Pressable
+                  className="mt-4 self-start"
+                  onPress={handleUseDifferentAccount}
+                >
+                  <Text className="text-sm font-medium text-slate-600">
+                    Use a different account
+                  </Text>
                 </Pressable>
               </>
             )}
