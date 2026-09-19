@@ -1,9 +1,12 @@
 import { useUser } from "@clerk/expo";
 import { router, useLocalSearchParams } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
+import { File } from "expo-file-system";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Pressable,
   ScrollView,
   Switch,
@@ -35,6 +38,12 @@ const EditProperty = () => {
   const [longitude, setLongitude] = useState("");
   const [isSold, setIsSold] = useState(false);
 
+  const [existingImages, setExistingImages] = useState<string[]>([]);
+  const [newImages, setNewImages] = useState<ImagePicker.ImagePickerAsset[]>(
+    [],
+  );
+  const [removedImages, setRemovedImages] = useState<string[]>([]);
+
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -52,8 +61,6 @@ const EditProperty = () => {
         .single();
 
       if (error) {
-        console.log("Fetch property error:", error.message);
-
         Alert.alert("Error", "Could not load this property.", [
           {
             text: "OK",
@@ -65,8 +72,6 @@ const EditProperty = () => {
         return;
       }
 
-      // Security check on the client side.
-      // The database RLS is still the real protection.
       if (data.clerk_user_id !== user?.id) {
         Alert.alert("Access Denied", "You can only edit your own properties.", [
           {
@@ -79,7 +84,6 @@ const EditProperty = () => {
         return;
       }
 
-      // Fill form with existing property data
       setTitle(data.title);
       setDescription(data.description ?? "");
       setPrice(String(data.price));
@@ -92,6 +96,7 @@ const EditProperty = () => {
       setLatitude(data.latitude !== null ? String(data.latitude) : "");
       setLongitude(data.longitude !== null ? String(data.longitude) : "");
       setIsSold(data.is_sold);
+      setExistingImages(data.images ?? []);
 
       setIsLoading(false);
     };
@@ -100,6 +105,135 @@ const EditProperty = () => {
       fetchProperty();
     }
   }, [id, user, supabase]);
+
+  const pickImages = async () => {
+    const totalImages = existingImages.length + newImages.length;
+
+    if (totalImages >= 5) {
+      Alert.alert("Maximum Images", "You can have a maximum of 5 images.");
+      return;
+    }
+
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      Alert.alert(
+        "Permission Required",
+        "Please allow photo library access to select property images.",
+      );
+      return;
+    }
+
+    const remainingSlots = 5 - totalImages;
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsMultipleSelection: true,
+      selectionLimit: remainingSlots,
+      quality: 0.8,
+    });
+
+    if (result.canceled) {
+      return;
+    }
+
+    setNewImages((currentImages) => [
+      ...currentImages,
+      ...result.assets.slice(0, remainingSlots),
+    ]);
+  };
+
+  const removeExistingImage = (imageUrl: string) => {
+    setExistingImages((currentImages) =>
+      currentImages.filter((image) => image !== imageUrl),
+    );
+
+    setRemovedImages((currentImages) => [...currentImages, imageUrl]);
+  };
+
+  const removeNewImage = (uri: string) => {
+    setNewImages((currentImages) =>
+      currentImages.filter((image) => image.uri !== uri),
+    );
+  };
+
+  const getStoragePathFromUrl = (url: string) => {
+    const marker = "/storage/v1/object/public/property-images/";
+
+    const index = url.indexOf(marker);
+
+    if (index === -1) {
+      return null;
+    }
+
+    return decodeURIComponent(url.substring(index + marker.length));
+  };
+
+  const uploadNewImages = async () => {
+    if (!user?.id || !id || newImages.length === 0) {
+      return [];
+    }
+
+    const uploadedUrls: string[] = [];
+
+    for (let index = 0; index < newImages.length; index++) {
+      const image = newImages[index];
+
+      const file = new File(image.uri);
+      const arrayBuffer = await file.arrayBuffer();
+
+      const mimeType = image.mimeType ?? "image/jpeg";
+      const extension =
+        mimeType === "image/png"
+          ? "png"
+          : mimeType === "image/webp"
+            ? "webp"
+            : "jpg";
+
+      const filePath = `${user.id}/${id}/image-${Date.now()}-${index}.${extension}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("property-images")
+        .upload(filePath, arrayBuffer, {
+          contentType: mimeType,
+          upsert: false,
+        });
+
+      if (uploadError) {
+        throw new Error(uploadError.message);
+      }
+
+      const { data } = supabase.storage
+        .from("property-images")
+        .getPublicUrl(filePath);
+
+      uploadedUrls.push(data.publicUrl);
+    }
+
+    return uploadedUrls;
+  };
+
+  const deleteRemovedImages = async () => {
+    if (removedImages.length === 0) {
+      return;
+    }
+
+    const storagePaths = removedImages
+      .map(getStoragePathFromUrl)
+      .filter((path): path is string => path !== null);
+
+    if (storagePaths.length === 0) {
+      return;
+    }
+
+    const { error } = await supabase.storage
+      .from("property-images")
+      .remove(storagePaths);
+
+    if (error) {
+      console.log("Delete removed images error:", error.message);
+    }
+  };
 
   const handleUpdateProperty = async () => {
     if (!user) {
@@ -164,6 +298,10 @@ const EditProperty = () => {
     setIsSaving(true);
 
     try {
+      const uploadedUrls = await uploadNewImages();
+
+      const finalImages = [...existingImages, ...uploadedUrls];
+
       const { error } = await supabase
         .from("properties")
         .update({
@@ -178,21 +316,21 @@ const EditProperty = () => {
           city: city.trim(),
           latitude: latitude ? Number(latitude) : null,
           longitude: longitude ? Number(longitude) : null,
+          images: finalImages,
           is_sold: isSold,
         })
         .eq("id", id)
         .eq("clerk_user_id", user.id);
 
       if (error) {
-        console.log("Update property error:", error.message);
-
         Alert.alert(
           "Update Failed",
           "Could not update the property. Please try again.",
         );
-
         return;
       }
+
+      await deleteRemovedImages();
 
       Alert.alert("Success", "Property updated successfully.", [
         {
@@ -219,6 +357,8 @@ const EditProperty = () => {
     );
   }
 
+  const totalImages = existingImages.length + newImages.length;
+
   return (
     <ScrollView
       className="flex-1 bg-white"
@@ -228,13 +368,91 @@ const EditProperty = () => {
         paddingBottom: 40,
       }}
     >
-      {/* Header */}
-
       <Text className="text-2xl font-bold text-slate-900">Edit Property</Text>
 
       <Text className="mt-1 text-sm text-slate-500">
         Update your property details.
       </Text>
+
+      {/* Images */}
+
+      <View className="mt-7">
+        <View className="flex-row items-center justify-between">
+          <Text className="text-sm font-semibold text-slate-700">
+            Property Images
+          </Text>
+
+          <Text className="text-xs text-slate-500">{totalImages}/5</Text>
+        </View>
+
+        <View className="mt-3 flex-row flex-wrap gap-3">
+          {existingImages.map((imageUrl) => (
+            <View
+              key={imageUrl}
+              className="relative h-28 w-[30%] overflow-hidden rounded-xl bg-slate-100"
+            >
+              <Image
+                source={{ uri: imageUrl }}
+                className="h-full w-full"
+                resizeMode="cover"
+              />
+
+              <Pressable
+                className="absolute right-1.5 top-1.5 h-7 w-7 items-center justify-center rounded-full bg-black/60"
+                onPress={() => removeExistingImage(imageUrl)}
+                disabled={isSaving}
+              >
+                <Text className="text-base font-bold text-white">×</Text>
+              </Pressable>
+            </View>
+          ))}
+
+          {newImages.map((image) => (
+            <View
+              key={image.uri}
+              className="relative h-28 w-[30%] overflow-hidden rounded-xl bg-slate-100"
+            >
+              <Image
+                source={{ uri: image.uri }}
+                className="h-full w-full"
+                resizeMode="cover"
+              />
+
+              <View className="absolute bottom-1 left-1 rounded-md bg-blue-600 px-1.5 py-0.5">
+                <Text className="text-[10px] font-semibold text-white">
+                  New
+                </Text>
+              </View>
+
+              <Pressable
+                className="absolute right-1.5 top-1.5 h-7 w-7 items-center justify-center rounded-full bg-black/60"
+                onPress={() => removeNewImage(image.uri)}
+                disabled={isSaving}
+              >
+                <Text className="text-base font-bold text-white">×</Text>
+              </Pressable>
+            </View>
+          ))}
+
+          {totalImages < 5 && (
+            <Pressable
+              className="h-28 w-[30%] items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 active:bg-slate-100"
+              onPress={pickImages}
+              disabled={isSaving}
+            >
+              <Text className="text-2xl text-slate-400">+</Text>
+
+              <Text className="mt-1 text-xs font-medium text-slate-500">
+                Add Image
+              </Text>
+            </Pressable>
+          )}
+        </View>
+
+        <Text className="mt-2 text-xs text-slate-400">
+          You can upload up to 5 images.
+        </Text>
+      </View>
 
       {/* Title */}
 

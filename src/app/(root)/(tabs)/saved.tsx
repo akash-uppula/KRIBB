@@ -50,10 +50,6 @@ const Saved = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
 
-  // --------------------------------
-  // Fetch saved properties
-  // --------------------------------
-
   const fetchSavedProperties = async () => {
     if (!user?.id) {
       setProperties([]);
@@ -62,7 +58,6 @@ const Saved = () => {
     }
 
     try {
-      // First get the user's saved property records
       const { data: savedData, error: savedError } = await supabase
         .from("saved_properties")
         .select("id, property_id, created_at")
@@ -70,36 +65,26 @@ const Saved = () => {
         .order("created_at", { ascending: false });
 
       if (savedError) {
-        console.log("Fetch saved properties error:", savedError.message);
-
         return;
       }
 
       const savedProperties = (savedData ?? []) as SavedProperty[];
-
-      // No saved properties
       if (savedProperties.length === 0) {
         setProperties([]);
         return;
       }
 
       const propertyIds = savedProperties.map((saved) => saved.property_id);
-
-      // Get the actual properties
       const { data: propertyData, error: propertyError } = await supabase
         .from("properties")
         .select("*")
         .in("id", propertyIds);
 
       if (propertyError) {
-        console.log("Fetch property details error:", propertyError.message);
-
         return;
       }
 
       const fetchedProperties = (propertyData ?? []) as Property[];
-
-      // Keep the same order as saved_properties
       const propertyMap = new Map(
         fetchedProperties.map((property) => [property.id, property]),
       );
@@ -110,25 +95,16 @@ const Saved = () => {
 
       setProperties(orderedProperties);
     } catch (error) {
-      console.log("Unexpected saved properties error:", error);
     } finally {
       setIsLoading(false);
     }
   };
-
-  // --------------------------------
-  // Load whenever Saved tab opens
-  // --------------------------------
 
   useFocusEffect(
     useCallback(() => {
       fetchSavedProperties();
     }, [user?.id, supabase]),
   );
-
-  // --------------------------------
-  // Pull to refresh
-  // --------------------------------
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -137,10 +113,6 @@ const Saved = () => {
 
     setIsRefreshing(false);
   };
-
-  // --------------------------------
-  // Remove saved property
-  // --------------------------------
 
   const removeSavedProperty = async (propertyId: string) => {
     if (!user?.id || removingId) return;
@@ -155,37 +127,23 @@ const Saved = () => {
         .eq("property_id", propertyId);
 
       if (error) {
-        console.log("Remove saved property error:", error.message);
-
         Alert.alert("Error", "Could not remove this property from saved.");
 
         return;
       }
-
-      // Immediately remove it from the UI
       setProperties((currentProperties) =>
         currentProperties.filter((property) => property.id !== propertyId),
       );
     } catch (error) {
-      console.log("Unexpected remove saved error:", error);
-
       Alert.alert("Error", "Something went wrong. Please try again.");
     } finally {
       setRemovingId(null);
     }
   };
 
-  // --------------------------------
-  // Format price
-  // --------------------------------
-
   const formatPrice = (price: number) => {
     return `₹${Number(price).toLocaleString("en-IN")}`;
   };
-
-  // --------------------------------
-  // Loading
-  // --------------------------------
 
   if (isLoading) {
     return (
@@ -198,10 +156,6 @@ const Saved = () => {
       </View>
     );
   }
-
-  // --------------------------------
-  // Main screen
-  // --------------------------------
 
   return (
     <ScrollView
@@ -291,14 +245,35 @@ const Saved = () => {
                   )}
 
                   {/* Featured badge */}
+                  <View className="absolute left-3 top-3 flex-row items-center gap-2">
+                    {property.is_featured && (
+                      <View className="rounded-full bg-yellow-100 px-3 py-1">
+                        <Text className="text-xs font-semibold text-yellow-700">
+                          Featured
+                        </Text>
+                      </View>
+                    )}
 
-                  {property.is_featured && (
-                    <View className="absolute left-3 top-3 rounded-full bg-yellow-100 px-3 py-1">
-                      <Text className="text-xs font-semibold text-yellow-700">
-                        Featured
+                    <View
+                      className={`rounded-full px-3 py-1 ${
+                        property.clerk_user_id === user?.id
+                          ? "bg-blue-100"
+                          : "bg-slate-100"
+                      }`}
+                    >
+                      <Text
+                        className={`text-xs font-semibold ${
+                          property.clerk_user_id === user?.id
+                            ? "text-blue-700"
+                            : "text-slate-600"
+                        }`}
+                      >
+                        {property.clerk_user_id === user?.id
+                          ? "My Property"
+                          : "Property"}
                       </Text>
                     </View>
-                  )}
+                  </View>
 
                   {/* Sold badge */}
 
