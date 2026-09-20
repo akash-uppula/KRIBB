@@ -312,18 +312,18 @@ const Properties = () => {
                   {/* Ownership / Featured / Sold */}
 
                   <View className="flex-row flex-wrap items-center">
-                    {isMyProperty && (
-                      <View className="mr-2 rounded-full bg-blue-100 px-3 py-1">
-                        <Text className="text-xs font-semibold text-blue-700">
-                          Your Property
-                        </Text>
-                      </View>
-                    )}
-
                     {property.is_featured && (
                       <View className="mr-2 rounded-full bg-yellow-100 px-3 py-1">
                         <Text className="text-xs font-semibold text-yellow-700">
                           Featured
+                        </Text>
+                      </View>
+                    )}
+
+                    {isMyProperty && (
+                      <View className="mr-2 rounded-full bg-blue-100 px-3 py-1">
+                        <Text className="text-xs font-semibold text-blue-700">
+                          My Property
                         </Text>
                       </View>
                     )}
