@@ -196,21 +196,55 @@ const PropertyDetails = () => {
     );
   };
 
+  const getStoragePathFromUrl = (url: string) => {
+    const marker = "/storage/v1/object/public/property-images/";
+
+    const index = url.indexOf(marker);
+
+    if (index === -1) {
+      return null;
+    }
+
+    return decodeURIComponent(url.substring(index + marker.length));
+  };
+
   const deleteProperty = async () => {
-    if (!property) {
+    if (!property || !user?.id) {
       return;
     }
 
     setIsDeleting(true);
 
     try {
-      const { error } = await supabase
+      const storagePaths = (property.images ?? [])
+        .map(getStoragePathFromUrl)
+        .filter((path): path is string => path !== null);
+
+      if (storagePaths.length > 0) {
+        const { error: storageError } = await supabase.storage
+          .from("property-images")
+          .remove(storagePaths);
+
+        if (storageError) {
+          console.log("Delete property images error:", storageError.message);
+
+          Alert.alert(
+            "Delete Failed",
+            "Could not delete the property images. The property was not deleted.",
+          );
+
+          return;
+        }
+      }
+
+      const { error: deleteError } = await supabase
         .from("properties")
         .delete()
-        .eq("id", property.id);
+        .eq("id", property.id)
+        .eq("clerk_user_id", user.id);
 
-      if (error) {
-        console.log("Delete property error:", error.message);
+      if (deleteError) {
+        console.log("Delete property error:", deleteError.message);
 
         Alert.alert(
           "Delete Failed",
