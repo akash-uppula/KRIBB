@@ -1,6 +1,6 @@
 import { useUser } from "@clerk/expo";
-import { router, useFocusEffect } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -39,14 +39,22 @@ const propertyTypes = ["all", "apartment", "house", "villa", "studio"];
 const Properties = () => {
   const { user } = useUser();
   const supabase = useSupabase();
+  const { search } = useLocalSearchParams<{ search?: string }>();
 
   const [properties, setProperties] = useState<Property[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const [searchText, setSearchText] = useState("");
+  const [searchText, setSearchText] = useState(
+    typeof search === "string" ? search : "",
+  );
   const [selectedType, setSelectedType] = useState("all");
+  const [selectedStatus, setSelectedStatus] = useState("all");
   const [showOnlyMine, setShowOnlyMine] = useState(false);
+
+  useEffect(() => {
+    setSearchText(typeof search === "string" ? search : "");
+  }, [search]);
 
   const fetchProperties = async () => {
     const { data, error } = await supabase
@@ -99,6 +107,19 @@ const Properties = () => {
         return false;
       }
 
+      // Featured / Sold status filter
+      if (selectedStatus === "featured" && !property.is_featured) {
+        return false;
+      }
+
+      if (selectedStatus === "available" && property.is_sold) {
+        return false;
+      }
+
+      if (selectedStatus === "sold" && !property.is_sold) {
+        return false;
+      }
+
       // Search filter
       if (!search) {
         return true;
@@ -116,7 +137,14 @@ const Properties = () => {
 
       return searchableText.includes(search);
     });
-  }, [properties, searchText, selectedType, showOnlyMine, user?.id]);
+  }, [
+    properties,
+    searchText,
+    selectedType,
+    selectedStatus,
+    showOnlyMine,
+    user?.id,
+  ]);
 
   const formatPrice = (price: number) => {
     return `₹${price.toLocaleString("en-IN")}`;
@@ -236,6 +264,49 @@ const Properties = () => {
         </ScrollView>
       </View>
 
+      {/* Status Filters */}
+
+      <View className="mt-4">
+        <Text className="mb-2 text-sm font-semibold text-slate-700">
+          Property Status
+        </Text>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{
+            gap: 8,
+          }}
+        >
+          {[
+            { label: "All", value: "all" },
+            { label: "Featured", value: "featured" },
+            { label: "Available", value: "available" },
+            { label: "Sold", value: "sold" },
+          ].map((item) => (
+            <Pressable
+              key={item.value}
+              onPress={() => setSelectedStatus(item.value)}
+              className={`rounded-full border px-4 py-2.5 ${
+                selectedStatus === item.value
+                  ? "border-blue-600 bg-blue-600"
+                  : "border-slate-300 bg-white"
+              }`}
+            >
+              <Text
+                className={`font-medium ${
+                  selectedStatus === item.value
+                    ? "text-white"
+                    : "text-slate-700"
+                }`}
+              >
+                {item.label}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
+
       {/* Result Count */}
 
       <Text className="mt-6 text-sm font-medium text-slate-500">
@@ -257,12 +328,16 @@ const Properties = () => {
               : "Try changing your search or property type."}
           </Text>
 
-          {(searchText || selectedType !== "all" || showOnlyMine) && (
+          {(searchText ||
+            selectedType !== "all" ||
+            selectedStatus !== "all" ||
+            showOnlyMine) && (
             <Pressable
               className="mt-5 rounded-xl bg-blue-600 px-5 py-3"
               onPress={() => {
                 setSearchText("");
                 setSelectedType("all");
+                setSelectedStatus("all");
                 setShowOnlyMine(false);
               }}
             >

@@ -9,6 +9,7 @@ import {
   RefreshControl,
   ScrollView,
   Text,
+  TextInput,
   View,
 } from "react-native";
 
@@ -40,6 +41,7 @@ const Home = () => {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [searchText, setSearchText] = useState("");
 
   const fetchProperties = async () => {
     try {
@@ -48,6 +50,7 @@ const Home = () => {
         .from("properties")
         .select("*")
         .eq("is_featured", true)
+        .eq("is_sold", false)
         .order("created_at", { ascending: false })
         .limit(5);
 
@@ -139,6 +142,43 @@ const Home = () => {
         <Text className="mt-2 text-base text-slate-500">
           Find your next property.
         </Text>
+      </View>
+
+      {/* Search */}
+
+      <View className="mx-5 flex-row items-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-1">
+        <Ionicons name="search-outline" size={22} color="#64748B" />
+
+        <TextInput
+          value={searchText}
+          onChangeText={setSearchText}
+          placeholder="Search properties..."
+          placeholderTextColor="#94A3B8"
+          returnKeyType="search"
+          onSubmitEditing={() => {
+            const query = searchText.trim();
+
+            router.push({
+              pathname: "/properties",
+              params: query ? { search: query } : undefined,
+            });
+          }}
+          className="ml-3 h-12 flex-1 text-sm text-slate-900"
+        />
+
+        <Pressable
+          onPress={() => {
+            const query = searchText.trim();
+
+            router.push({
+              pathname: "/properties",
+              params: query ? { search: query } : undefined,
+            });
+          }}
+          className="ml-2 p-2"
+        >
+          <Ionicons name="arrow-forward-circle" size={24} color="#2563EB" />
+        </Pressable>
       </View>
 
       {/* Featured */}
