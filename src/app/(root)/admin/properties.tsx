@@ -1,6 +1,6 @@
 import { useUser } from "@clerk/expo";
 import { router } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -9,6 +9,7 @@ import {
   RefreshControl,
   ScrollView,
   Text,
+  TextInput,
   View,
 } from "react-native";
 
@@ -36,6 +37,9 @@ const AdminProperties = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+
+  const [searchText, setSearchText] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState("all");
 
   const checkAdmin = useCallback(async () => {
     if (!user?.id) return false;
@@ -150,6 +154,44 @@ const AdminProperties = () => {
     );
   };
 
+  const filteredProperties = useMemo(() => {
+    const search = searchText.trim().toLowerCase();
+
+    return properties.filter((property) => {
+      if (selectedStatus === "featured" && !property.is_featured) {
+        return false;
+      }
+
+      if (selectedStatus === "available" && property.is_sold) {
+        return false;
+      }
+
+      if (selectedStatus === "sold" && !property.is_sold) {
+        return false;
+      }
+
+      if (!search) {
+        return true;
+      }
+
+      const searchableText = [
+        property.title,
+        property.city,
+        property.address,
+        property.type,
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return searchableText.includes(search);
+    });
+  }, [properties, searchText, selectedStatus]);
+
+  const clearFilters = () => {
+    setSearchText("");
+    setSelectedStatus("all");
+  };
+
   if (isLoading || isAdmin === null) {
     return (
       <View className="flex-1 items-center justify-center bg-white">
@@ -197,23 +239,95 @@ const AdminProperties = () => {
       </Text>
 
       <Text className="mt-1 text-sm text-slate-500">
-        {properties.length}{" "}
-        {properties.length === 1 ? "property" : "properties"} total
+        {filteredProperties.length}{" "}
+        {filteredProperties.length === 1 ? "property" : "properties"} found
       </Text>
 
-      {properties.length === 0 ? (
+      {/* Search */}
+      <View className="mt-5 flex-row items-center rounded-xl border border-slate-200 bg-white px-4">
+        <Text className="mr-2 text-lg text-slate-400">⌕</Text>
+
+        <TextInput
+          value={searchText}
+          onChangeText={setSearchText}
+          placeholder="Search title, city or address..."
+          placeholderTextColor="#94A3B8"
+          className="h-12 flex-1 text-sm text-slate-900"
+        />
+      </View>
+
+      {/* Status Filters */}
+      <View className="mt-4">
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{
+            gap: 8,
+          }}
+        >
+          {[
+            { label: "All", value: "all" },
+            { label: "Featured", value: "featured" },
+            { label: "Available", value: "available" },
+            { label: "Sold", value: "sold" },
+          ].map((item) => (
+            <Pressable
+              key={item.value}
+              onPress={() => setSelectedStatus(item.value)}
+              className={`rounded-full border px-4 py-2.5 ${
+                selectedStatus === item.value
+                  ? "border-blue-600 bg-blue-600"
+                  : "border-slate-300 bg-white"
+              }`}
+            >
+              <Text
+                className={`font-medium ${
+                  selectedStatus === item.value
+                    ? "text-white"
+                    : "text-slate-700"
+                }`}
+              >
+                {item.label}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
+
+      {/* Clear Filters */}
+      {(searchText || selectedStatus !== "all") && (
+        <Pressable
+          onPress={clearFilters}
+          className="mt-3 self-start rounded-lg px-2 py-1"
+        >
+          <Text className="text-sm font-semibold text-blue-600">
+            Clear Filters
+          </Text>
+        </Pressable>
+      )}
+
+      {filteredProperties.length === 0 ? (
         <View className="mt-6 items-center rounded-2xl border border-slate-200 bg-white p-8">
           <Text className="text-lg font-semibold text-slate-900">
-            No properties
+            No properties found
           </Text>
 
           <Text className="mt-2 text-center text-sm text-slate-500">
-            There are no properties to manage yet.
+            Try changing your search or selected filter.
           </Text>
+
+          {(searchText || selectedStatus !== "all") && (
+            <Pressable
+              onPress={clearFilters}
+              className="mt-5 rounded-xl bg-blue-600 px-5 py-3"
+            >
+              <Text className="font-semibold text-white">Clear Filters</Text>
+            </Pressable>
+          )}
         </View>
       ) : (
         <View className="mt-5 gap-5">
-          {properties.map((property) => {
+          {filteredProperties.map((property) => {
             const isUpdating = updatingId === property.id;
 
             return (
