@@ -19,6 +19,8 @@ const Profile = () => {
   const supabase = useSupabase();
 
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isCheckingAdmin, setIsCheckingAdmin] = useState(true);
 
   const firstName = user?.firstName ?? "";
   const lastName = user?.lastName ?? "";
@@ -37,13 +39,18 @@ const Profile = () => {
       // Check if profile already exists
       const { data: existingProfile, error: fetchError } = await supabase
         .from("profiles")
-        .select("id")
+        .select("id, is_admin")
         .eq("clerk_user_id", user.id)
         .maybeSingle();
 
       if (fetchError) {
         console.log("Profile check error:", fetchError.message);
+        setIsCheckingAdmin(false);
         return;
+      }
+
+      if (existingProfile) {
+        setIsAdmin(existingProfile.is_admin === true);
       }
 
       // Create profile if it doesn't exist
@@ -57,10 +64,12 @@ const Profile = () => {
 
         if (insertError) {
           console.log("Profile creation error:", insertError.message);
+          setIsCheckingAdmin(false);
           return;
         }
 
-        console.log("Profile created successfully");
+        setIsAdmin(false);
+        setIsCheckingAdmin(false);
         return;
       }
 
@@ -76,14 +85,20 @@ const Profile = () => {
 
       if (updateError) {
         console.log("Profile update error:", updateError.message);
+        setIsCheckingAdmin(false);
         return;
       }
 
-      console.log("Profile synced successfully");
+      setIsCheckingAdmin(false);
     };
 
     syncProfile();
   }, [user, supabase]);
+
+  // Open Admin Panel
+  const handleAdminPanel = () => {
+    router.push("/(root)/admin");
+  };
 
   // Sign out
   const handleSignOut = async () => {
@@ -167,9 +182,23 @@ const Profile = () => {
           </View>
         </View>
 
+        {/* Admin Panel */}
+        {!isCheckingAdmin && isAdmin && (
+          <Pressable
+            className="mt-7 h-14 flex-row items-center justify-center rounded-xl bg-slate-900 active:bg-slate-800"
+            onPress={handleAdminPanel}
+          >
+            <Text className="text-base font-semibold text-white">
+              Admin Panel
+            </Text>
+          </Pressable>
+        )}
+
         {/* Back to Home */}
         <Pressable
-          className="mt-7 h-14 items-center justify-center rounded-xl border border-blue-600 bg-white active:bg-blue-50"
+          className={`h-14 items-center justify-center rounded-xl border border-blue-600 bg-white active:bg-blue-50 ${
+            !isCheckingAdmin && isAdmin ? "mt-4" : "mt-7"
+          }`}
           onPress={handleBackToHome}
         >
           <Text className="text-base font-semibold text-blue-600">
