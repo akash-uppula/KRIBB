@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useUser } from "@clerk/expo";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import * as ExpoLinking from "expo-linking";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -13,6 +14,7 @@ import {
 } from "react-native";
 
 import { useSupabase } from "../../../../hooks/useSupabase";
+import MapView, { Marker } from "react-native-maps";
 
 type Property = {
   id: string;
@@ -48,6 +50,8 @@ const PropertyDetails = () => {
 
   const [isSaved, setIsSaved] = useState(false);
 
+  const [ownerEmail, setOwnerEmail] = useState<string | null>(null);
+
   const [isSaving, setIsSaving] = useState(false);
 
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -74,6 +78,12 @@ const PropertyDetails = () => {
     setProperty(data);
     setCurrentImageIndex(0);
     setIsLoading(false);
+
+    if (data?.clerk_user_id) {
+      await fetchOwnerEmail(data.clerk_user_id);
+    } else {
+      setOwnerEmail(null);
+    }
   };
 
   useFocusEffect(
@@ -81,6 +91,20 @@ const PropertyDetails = () => {
       fetchProperty();
     }, [id]),
   );
+
+  const fetchOwnerEmail = async (ownerClerkUserId: string) => {
+    const { data, error } = await supabase.rpc("get_property_owner_email", {
+      owner_clerk_user_id: ownerClerkUserId,
+    });
+
+    if (error) {
+      console.log("Fetch owner email error:", error.message);
+      setOwnerEmail(null);
+      return;
+    }
+
+    setOwnerEmail(data ?? null);
+  };
 
   const checkIfSaved = async () => {
     if (!id || !user?.id) {
@@ -152,6 +176,64 @@ const PropertyDetails = () => {
       Alert.alert("Error", "Something went wrong. Please try again.");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleContactOwner = async () => {
+    if (!property || !ownerEmail) {
+      Alert.alert(
+        "Owner email unavailable",
+        "The owner's email address is not available right now.",
+      );
+      return;
+    }
+
+    const subject = `Inquiry about ${property.title}`;
+    const body = `Hi,
+
+I am interested in your property "${property.title}" listed on KRIBB.
+
+I would like to know more about the property.
+
+Thank you.`;
+
+    const mailUrl =
+      `mailto:${ownerEmail}` +
+      `?subject=${encodeURIComponent(subject)}` +
+      `&body=${encodeURIComponent(body)}`;
+
+    try {
+      const canOpen = await ExpoLinking.canOpenURL(mailUrl);
+
+      if (!canOpen) {
+        Alert.alert(
+          "Email App Not Available",
+          "No email app is available on this device.",
+        );
+        return;
+      }
+
+      await ExpoLinking.openURL(mailUrl);
+    } catch (error) {
+      console.log("Open email error:", error);
+      Alert.alert("Error", "Could not open the email app.");
+    }
+  };
+
+  const handleOpenMap = async () => {
+    if (!property?.latitude || !property?.longitude) {
+      return;
+    }
+
+    const { latitude, longitude } = property;
+
+    const url = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
+
+    try {
+      await ExpoLinking.openURL(url);
+    } catch (error) {
+      console.log("Open map error:", error);
+      Alert.alert("Error", "Could not open Google Maps.");
     }
   };
 
@@ -473,6 +555,38 @@ const PropertyDetails = () => {
           )}
         </View>
 
+        {/* Contact Owner */}
+
+        {!isMyProperty && (
+          <View className="mt-7">
+            <Text className="mb-3 text-lg font-bold text-slate-900">
+              Contact Owner
+            </Text>
+
+            <Pressable
+              onPress={handleContactOwner}
+              disabled={!ownerEmail}
+              className={`h-14 flex-row items-center justify-center rounded-xl ${
+                ownerEmail ? "bg-blue-600 active:bg-blue-700" : "bg-slate-200"
+              }`}
+            >
+              <Ionicons
+                name="mail-outline"
+                size={21}
+                color={ownerEmail ? "#FFFFFF" : "#94A3B8"}
+              />
+
+              <Text
+                className={`ml-2 text-base font-semibold ${
+                  ownerEmail ? "text-white" : "text-slate-400"
+                }`}
+              >
+                {ownerEmail ? "Contact Owner" : "Owner Email Unavailable"}
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
         {/* Description */}
 
         <View className="mt-7">
@@ -495,23 +609,48 @@ const PropertyDetails = () => {
           <Text className="mt-1 text-base text-slate-600">{property.city}</Text>
         </View>
 
-        {/* Coordinates */}
+        {/* Property Location */}
 
-        {(property.latitude !== null || property.longitude !== null) && (
+        {property.latitude !== null && property.longitude !== null && (
           <View className="mt-7">
-            <Text className="text-lg font-bold text-slate-900">Location</Text>
-
-            {property.latitude !== null && (
-              <Text className="mt-2 text-sm text-slate-500">
-                Latitude: {property.latitude}
+            <View className="flex-row items-center justify-between">
+              <Text className="text-lg font-bold text-slate-900">
+                Property Location
               </Text>
-            )}
 
-            {property.longitude !== null && (
-              <Text className="mt-1 text-sm text-slate-500">
-                Longitude: {property.longitude}
-              </Text>
-            )}
+              <Pressable onPress={handleOpenMap}>
+                <Text className="text-sm font-semibold text-blue-600">
+                  Open in Maps
+                </Text>
+              </Pressable>
+            </View>
+
+            <View className="mt-3 overflow-hidden rounded-2xl border border-slate-200">
+              <MapView
+                className="h-64 w-full"
+                initialRegion={{
+                  latitude: property.latitude,
+                  longitude: property.longitude,
+                  latitudeDelta: 0.005,
+                  longitudeDelta: 0.005,
+                }}
+                scrollEnabled={false}
+                zoomEnabled={false}
+              >
+                <Marker
+                  coordinate={{
+                    latitude: property.latitude,
+                    longitude: property.longitude,
+                  }}
+                  title={property.title}
+                  description={`${property.address}, ${property.city}`}
+                />
+              </MapView>
+            </View>
+
+            <Text className="mt-2 text-xs text-slate-400">
+              {property.latitude}, {property.longitude}
+            </Text>
           </View>
         )}
 
