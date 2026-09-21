@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Modal,
   Pressable,
   ScrollView,
   Text,
@@ -55,6 +56,10 @@ const PropertyDetails = () => {
   const [isSaving, setIsSaving] = useState(false);
 
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  // Full-screen image viewer
+  const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
+  const [viewerImageIndex, setViewerImageIndex] = useState(0);
 
   const fetchProperty = async () => {
     if (!id) {
@@ -185,10 +190,12 @@ const PropertyDetails = () => {
         "Owner email unavailable",
         "The owner's email address is not available right now.",
       );
+
       return;
     }
 
     const subject = `Inquiry about ${property.title}`;
+
     const body = `Hi,
 
 I am interested in your property "${property.title}" listed on KRIBB.
@@ -210,18 +217,25 @@ Thank you.`;
           "Email App Not Available",
           "No email app is available on this device.",
         );
+
         return;
       }
 
       await ExpoLinking.openURL(mailUrl);
     } catch (error) {
       console.log("Open email error:", error);
+
       Alert.alert("Error", "Could not open the email app.");
     }
   };
 
   const handleOpenMap = async () => {
-    if (!property?.latitude || !property?.longitude) {
+    if (
+      property?.latitude === null ||
+      property?.latitude === undefined ||
+      property?.longitude === null ||
+      property?.longitude === undefined
+    ) {
       return;
     }
 
@@ -233,6 +247,7 @@ Thank you.`;
       await ExpoLinking.openURL(url);
     } catch (error) {
       console.log("Open map error:", error);
+
       Alert.alert("Error", "Could not open Google Maps.");
     }
   };
@@ -351,6 +366,17 @@ Thank you.`;
     }
   };
 
+  // Open full-screen image viewer
+  const openImageViewer = (index: number) => {
+    setViewerImageIndex(index);
+    setIsImageViewerVisible(true);
+  };
+
+  // Close full-screen image viewer
+  const closeImageViewer = () => {
+    setIsImageViewerVisible(false);
+  };
+
   if (isLoading) {
     return (
       <View className="flex-1 items-center justify-center bg-white">
@@ -378,17 +404,376 @@ Thank you.`;
   const propertyImages = property.images ?? [];
 
   return (
-    <ScrollView
-      className="flex-1 bg-white"
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={{
-        paddingBottom: 40,
-      }}
-    >
-      {/* Image Gallery */}
+    <>
+      <ScrollView
+        className="flex-1 bg-white"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingBottom: 40,
+        }}
+      >
+        {/* Image Gallery */}
 
-      {propertyImages.length > 0 ? (
-        <View className="relative">
+        {propertyImages.length > 0 ? (
+          <View className="relative">
+            <ScrollView
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onMomentumScrollEnd={(event) => {
+                const width = event.nativeEvent.layoutMeasurement.width;
+
+                const offset = event.nativeEvent.contentOffset.x;
+
+                const index = Math.round(offset / width);
+
+                setCurrentImageIndex(index);
+              }}
+            >
+              {propertyImages.map((image, index) => (
+                <Pressable
+                  key={`${image}-${index}`}
+                  onPress={() => openImageViewer(index)}
+                  className="w-screen"
+                >
+                  <Image
+                    source={{ uri: image }}
+                    className="h-64 w-screen bg-slate-100"
+                    resizeMode="cover"
+                  />
+                </Pressable>
+              ))}
+            </ScrollView>
+
+            {/* Image Counter */}
+
+            <View className="absolute bottom-4 right-4 rounded-full bg-black/70 px-3 py-1.5">
+              <Text className="text-xs font-semibold text-white">
+                {currentImageIndex + 1} / {propertyImages.length}
+              </Text>
+            </View>
+
+            {/* Image Dots */}
+
+            {propertyImages.length > 1 && (
+              <View className="absolute bottom-4 left-0 right-0 flex-row items-center justify-center">
+                {propertyImages.map((_, index) => (
+                  <View
+                    key={index}
+                    className={`mx-1 h-2 w-2 rounded-full ${
+                      index === currentImageIndex ? "bg-white" : "bg-white/50"
+                    }`}
+                  />
+                ))}
+              </View>
+            )}
+
+            {/* Tap Hint */}
+
+            <View className="absolute left-4 top-4 flex-row items-center rounded-full bg-black/60 px-3 py-2">
+              <Ionicons name="expand-outline" size={16} color="#FFFFFF" />
+
+              <Text className="ml-1.5 text-xs font-semibold text-white">
+                Tap to view
+              </Text>
+            </View>
+          </View>
+        ) : (
+          <View className="h-64 items-center justify-center bg-slate-100">
+            <Ionicons name="image-outline" size={48} color="#94A3B8" />
+
+            <Text className="mt-2 text-sm font-medium text-slate-400">
+              No images available
+            </Text>
+          </View>
+        )}
+
+        <View className="p-5">
+          {/* Status */}
+
+          <View className="flex-row flex-wrap items-center">
+            {property.is_featured && (
+              <View className="mr-2 rounded-full bg-yellow-100 px-3 py-1">
+                <Text className="text-xs font-semibold text-yellow-700">
+                  Featured
+                </Text>
+              </View>
+            )}
+
+            {isMyProperty && (
+              <View className="mr-2 rounded-full bg-blue-100 px-3 py-1">
+                <Text className="text-xs font-semibold text-blue-700">
+                  My Property
+                </Text>
+              </View>
+            )}
+
+            {property.is_sold && (
+              <View className="rounded-full bg-red-100 px-3 py-1">
+                <Text className="text-xs font-semibold text-red-700">Sold</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Title + Save */}
+
+          <View className="mt-4 flex-row items-start justify-between">
+            <Text className="mr-4 flex-1 text-2xl font-bold text-slate-900">
+              {property.title}
+            </Text>
+
+            <Pressable
+              onPress={toggleSaved}
+              disabled={isSaving}
+              className="h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white"
+            >
+              {isSaving ? (
+                <ActivityIndicator size="small" color="#2563EB" />
+              ) : (
+                <Ionicons
+                  name={isSaved ? "heart" : "heart-outline"}
+                  size={25}
+                  color={isSaved ? "#EF4444" : "#64748B"}
+                />
+              )}
+            </Pressable>
+          </View>
+
+          {/* Price */}
+
+          <Text className="mt-2 text-2xl font-bold text-blue-600">
+            {formatPrice(property.price)}
+          </Text>
+
+          {/* Location */}
+
+          <Text className="mt-2 text-base text-slate-500">
+            {property.address}, {property.city}
+          </Text>
+
+          {/* Property Summary */}
+
+          <View className="mt-6 flex-row rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <View className="flex-1 items-center">
+              <Text className="text-lg font-bold text-slate-900">
+                {property.bedrooms}
+              </Text>
+
+              <Text className="mt-1 text-xs text-slate-500">Bedrooms</Text>
+            </View>
+
+            <View className="w-px bg-slate-200" />
+
+            <View className="flex-1 items-center">
+              <Text className="text-lg font-bold text-slate-900">
+                {property.bathrooms}
+              </Text>
+
+              <Text className="mt-1 text-xs text-slate-500">Bathrooms</Text>
+            </View>
+
+            <View className="w-px bg-slate-200" />
+
+            <View className="flex-1 items-center">
+              <Text className="text-lg font-bold capitalize text-slate-900">
+                {property.type}
+              </Text>
+
+              <Text className="mt-1 text-xs text-slate-500">Type</Text>
+            </View>
+
+            {property.area_sqft && (
+              <>
+                <View className="w-px bg-slate-200" />
+
+                <View className="flex-1 items-center">
+                  <Text className="text-lg font-bold text-slate-900">
+                    {property.area_sqft}
+                  </Text>
+
+                  <Text className="mt-1 text-xs text-slate-500">Sqft</Text>
+                </View>
+              </>
+            )}
+          </View>
+
+          {/* Contact Owner */}
+
+          {!isMyProperty && (
+            <View className="mt-7">
+              <Text className="mb-3 text-lg font-bold text-slate-900">
+                Contact Owner
+              </Text>
+
+              <Pressable
+                onPress={handleContactOwner}
+                disabled={!ownerEmail}
+                className={`h-14 flex-row items-center justify-center rounded-xl ${
+                  ownerEmail ? "bg-blue-600 active:bg-blue-700" : "bg-slate-200"
+                }`}
+              >
+                <Ionicons
+                  name="mail-outline"
+                  size={21}
+                  color={ownerEmail ? "#FFFFFF" : "#94A3B8"}
+                />
+
+                <Text
+                  className={`ml-2 text-base font-semibold ${
+                    ownerEmail ? "text-white" : "text-slate-400"
+                  }`}
+                >
+                  {ownerEmail ? "Contact Owner" : "Owner Email Unavailable"}
+                </Text>
+              </Pressable>
+            </View>
+          )}
+
+          {/* Description */}
+
+          <View className="mt-7">
+            <Text className="text-lg font-bold text-slate-900">
+              Description
+            </Text>
+
+            <Text className="mt-2 text-base leading-6 text-slate-600">
+              {property.description || "No description available."}
+            </Text>
+          </View>
+
+          {/* Address */}
+
+          <View className="mt-7">
+            <Text className="text-lg font-bold text-slate-900">Address</Text>
+
+            <Text className="mt-2 text-base leading-6 text-slate-600">
+              {property.address}
+            </Text>
+
+            <Text className="mt-1 text-base text-slate-600">
+              {property.city}
+            </Text>
+          </View>
+
+          {/* Property Location */}
+
+          {property.latitude !== null && property.longitude !== null && (
+            <View className="mt-7">
+              <View className="flex-row items-center justify-between">
+                <Text className="text-lg font-bold text-slate-900">
+                  Property Location
+                </Text>
+
+                <Pressable onPress={handleOpenMap}>
+                  <Text className="text-sm font-semibold text-blue-600">
+                    Open in Maps
+                  </Text>
+                </Pressable>
+              </View>
+
+              <View className="mt-3 overflow-hidden rounded-2xl border border-slate-200">
+                <MapView
+                  className="h-64 w-full"
+                  initialRegion={{
+                    latitude: property.latitude,
+                    longitude: property.longitude,
+                    latitudeDelta: 0.005,
+                    longitudeDelta: 0.005,
+                  }}
+                  scrollEnabled={false}
+                  zoomEnabled={false}
+                >
+                  <Marker
+                    coordinate={{
+                      latitude: property.latitude,
+                      longitude: property.longitude,
+                    }}
+                    title={property.title}
+                    description={`${property.address}, ${property.city}`}
+                  />
+                </MapView>
+              </View>
+
+              <Text className="mt-2 text-xs text-slate-400">
+                {property.latitude}, {property.longitude}
+              </Text>
+            </View>
+          )}
+
+          {/* Owner Actions */}
+
+          {isMyProperty && (
+            <View className="mt-8">
+              <Text className="mb-3 text-lg font-bold text-slate-900">
+                Manage Property
+              </Text>
+
+              {/* Edit */}
+
+              <Pressable
+                className="h-14 items-center justify-center rounded-xl bg-blue-600 active:bg-blue-700"
+                onPress={handleEdit}
+                disabled={isDeleting}
+              >
+                <Text className="text-base font-semibold text-white">
+                  Edit Property
+                </Text>
+              </Pressable>
+
+              {/* Delete */}
+
+              <Pressable
+                className={`mt-3 h-14 items-center justify-center rounded-xl border border-red-500 ${
+                  isDeleting ? "bg-red-50" : "bg-white active:bg-red-50"
+                }`}
+                onPress={handleDelete}
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <ActivityIndicator color="#EF4444" />
+                ) : (
+                  <Text className="text-base font-semibold text-red-500">
+                    Delete Property
+                  </Text>
+                )}
+              </Pressable>
+            </View>
+          )}
+        </View>
+      </ScrollView>
+
+      {/* ===================================================== */}
+      {/* FULL SCREEN IMAGE VIEWER */}
+      {/* ===================================================== */}
+
+      <Modal
+        visible={isImageViewerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={closeImageViewer}
+      >
+        <View className="flex-1 bg-black">
+          {/* Close Button */}
+
+          <Pressable
+            onPress={closeImageViewer}
+            className="absolute right-5 top-12 z-20 h-11 w-11 items-center justify-center rounded-full bg-black/60"
+          >
+            <Ionicons name="close" size={28} color="#FFFFFF" />
+          </Pressable>
+
+          {/* Image Counter */}
+
+          <View className="absolute left-0 right-0 top-14 z-10 items-center">
+            <View className="rounded-full bg-black/60 px-4 py-2">
+              <Text className="text-sm font-semibold text-white">
+                {viewerImageIndex + 1} / {propertyImages.length}
+              </Text>
+            </View>
+          </View>
+
+          {/* Full Screen Images */}
+
           <ScrollView
             horizontal
             pagingEnabled
@@ -400,301 +785,43 @@ Thank you.`;
 
               const index = Math.round(offset / width);
 
-              setCurrentImageIndex(index);
+              setViewerImageIndex(index);
             }}
+            className="flex-1"
           >
             {propertyImages.map((image, index) => (
-              <Image
-                key={`${image}-${index}`}
-                source={{ uri: image }}
-                className="h-64 w-screen bg-slate-100"
-                resizeMode="cover"
-              />
+              <View
+                key={`${image}-fullscreen-${index}`}
+                className="w-screen flex-1 items-center justify-center"
+              >
+                <Image
+                  source={{ uri: image }}
+                  className="h-full w-full"
+                  resizeMode="contain"
+                />
+              </View>
             ))}
           </ScrollView>
 
-          {/* Image Counter */}
-
-          <View className="absolute bottom-4 right-4 rounded-full bg-black/70 px-3 py-1.5">
-            <Text className="text-xs font-semibold text-white">
-              {currentImageIndex + 1} / {propertyImages.length}
-            </Text>
-          </View>
-
-          {/* Image Dots */}
+          {/* Bottom Image Counter */}
 
           {propertyImages.length > 1 && (
-            <View className="absolute bottom-4 left-0 right-0 flex-row items-center justify-center">
-              {propertyImages.map((_, index) => (
-                <View
-                  key={index}
-                  className={`mx-1 h-2 w-2 rounded-full ${
-                    index === currentImageIndex ? "bg-white" : "bg-white/50"
-                  }`}
-                />
-              ))}
-            </View>
-          )}
-        </View>
-      ) : (
-        <View className="h-64 items-center justify-center bg-slate-100">
-          <Ionicons name="image-outline" size={48} color="#94A3B8" />
-
-          <Text className="mt-2 text-sm font-medium text-slate-400">
-            No images available
-          </Text>
-        </View>
-      )}
-
-      <View className="p-5">
-        {/* Status */}
-
-        <View className="flex-row flex-wrap items-center">
-          {property.is_featured && (
-            <View className="mr-2 rounded-full bg-yellow-100 px-3 py-1">
-              <Text className="text-xs font-semibold text-yellow-700">
-                Featured
-              </Text>
-            </View>
-          )}
-
-          {isMyProperty && (
-            <View className="mr-2 rounded-full bg-blue-100 px-3 py-1">
-              <Text className="text-xs font-semibold text-blue-700">
-                My Property
-              </Text>
-            </View>
-          )}
-
-          {property.is_sold && (
-            <View className="rounded-full bg-red-100 px-3 py-1">
-              <Text className="text-xs font-semibold text-red-700">Sold</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Title + Save */}
-
-        <View className="mt-4 flex-row items-start justify-between">
-          <Text className="mr-4 flex-1 text-2xl font-bold text-slate-900">
-            {property.title}
-          </Text>
-
-          <Pressable
-            onPress={toggleSaved}
-            disabled={isSaving}
-            className="h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white"
-          >
-            {isSaving ? (
-              <ActivityIndicator size="small" color="#2563EB" />
-            ) : (
-              <Ionicons
-                name={isSaved ? "heart" : "heart-outline"}
-                size={25}
-                color={isSaved ? "#EF4444" : "#64748B"}
-              />
-            )}
-          </Pressable>
-        </View>
-
-        {/* Price */}
-
-        <Text className="mt-2 text-2xl font-bold text-blue-600">
-          {formatPrice(property.price)}
-        </Text>
-
-        {/* Location */}
-
-        <Text className="mt-2 text-base text-slate-500">
-          {property.address}, {property.city}
-        </Text>
-
-        {/* Property Summary */}
-
-        <View className="mt-6 flex-row rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          <View className="flex-1 items-center">
-            <Text className="text-lg font-bold text-slate-900">
-              {property.bedrooms}
-            </Text>
-
-            <Text className="mt-1 text-xs text-slate-500">Bedrooms</Text>
-          </View>
-
-          <View className="w-px bg-slate-200" />
-
-          <View className="flex-1 items-center">
-            <Text className="text-lg font-bold text-slate-900">
-              {property.bathrooms}
-            </Text>
-
-            <Text className="mt-1 text-xs text-slate-500">Bathrooms</Text>
-          </View>
-
-          <View className="w-px bg-slate-200" />
-
-          <View className="flex-1 items-center">
-            <Text className="text-lg font-bold capitalize text-slate-900">
-              {property.type}
-            </Text>
-
-            <Text className="mt-1 text-xs text-slate-500">Type</Text>
-          </View>
-
-          {property.area_sqft && (
-            <>
-              <View className="w-px bg-slate-200" />
-
-              <View className="flex-1 items-center">
-                <Text className="text-lg font-bold text-slate-900">
-                  {property.area_sqft}
-                </Text>
-
-                <Text className="mt-1 text-xs text-slate-500">Sqft</Text>
+            <View className="absolute bottom-10 left-0 right-0 items-center">
+              <View className="flex-row items-center rounded-full bg-black/60 px-4 py-2">
+                {propertyImages.map((_, index) => (
+                  <View
+                    key={index}
+                    className={`mx-1 h-2 w-2 rounded-full ${
+                      index === viewerImageIndex ? "bg-white" : "bg-white/40"
+                    }`}
+                  />
+                ))}
               </View>
-            </>
+            </View>
           )}
         </View>
-
-        {/* Contact Owner */}
-
-        {!isMyProperty && (
-          <View className="mt-7">
-            <Text className="mb-3 text-lg font-bold text-slate-900">
-              Contact Owner
-            </Text>
-
-            <Pressable
-              onPress={handleContactOwner}
-              disabled={!ownerEmail}
-              className={`h-14 flex-row items-center justify-center rounded-xl ${
-                ownerEmail ? "bg-blue-600 active:bg-blue-700" : "bg-slate-200"
-              }`}
-            >
-              <Ionicons
-                name="mail-outline"
-                size={21}
-                color={ownerEmail ? "#FFFFFF" : "#94A3B8"}
-              />
-
-              <Text
-                className={`ml-2 text-base font-semibold ${
-                  ownerEmail ? "text-white" : "text-slate-400"
-                }`}
-              >
-                {ownerEmail ? "Contact Owner" : "Owner Email Unavailable"}
-              </Text>
-            </Pressable>
-          </View>
-        )}
-
-        {/* Description */}
-
-        <View className="mt-7">
-          <Text className="text-lg font-bold text-slate-900">Description</Text>
-
-          <Text className="mt-2 text-base leading-6 text-slate-600">
-            {property.description || "No description available."}
-          </Text>
-        </View>
-
-        {/* Address */}
-
-        <View className="mt-7">
-          <Text className="text-lg font-bold text-slate-900">Address</Text>
-
-          <Text className="mt-2 text-base leading-6 text-slate-600">
-            {property.address}
-          </Text>
-
-          <Text className="mt-1 text-base text-slate-600">{property.city}</Text>
-        </View>
-
-        {/* Property Location */}
-
-        {property.latitude !== null && property.longitude !== null && (
-          <View className="mt-7">
-            <View className="flex-row items-center justify-between">
-              <Text className="text-lg font-bold text-slate-900">
-                Property Location
-              </Text>
-
-              <Pressable onPress={handleOpenMap}>
-                <Text className="text-sm font-semibold text-blue-600">
-                  Open in Maps
-                </Text>
-              </Pressable>
-            </View>
-
-            <View className="mt-3 overflow-hidden rounded-2xl border border-slate-200">
-              <MapView
-                className="h-64 w-full"
-                initialRegion={{
-                  latitude: property.latitude,
-                  longitude: property.longitude,
-                  latitudeDelta: 0.005,
-                  longitudeDelta: 0.005,
-                }}
-                scrollEnabled={false}
-                zoomEnabled={false}
-              >
-                <Marker
-                  coordinate={{
-                    latitude: property.latitude,
-                    longitude: property.longitude,
-                  }}
-                  title={property.title}
-                  description={`${property.address}, ${property.city}`}
-                />
-              </MapView>
-            </View>
-
-            <Text className="mt-2 text-xs text-slate-400">
-              {property.latitude}, {property.longitude}
-            </Text>
-          </View>
-        )}
-
-        {/* Owner Actions */}
-
-        {isMyProperty && (
-          <View className="mt-8">
-            <Text className="mb-3 text-lg font-bold text-slate-900">
-              Manage Property
-            </Text>
-
-            {/* Edit */}
-
-            <Pressable
-              className="h-14 items-center justify-center rounded-xl bg-blue-600 active:bg-blue-700"
-              onPress={handleEdit}
-              disabled={isDeleting}
-            >
-              <Text className="text-base font-semibold text-white">
-                Edit Property
-              </Text>
-            </Pressable>
-
-            {/* Delete */}
-
-            <Pressable
-              className={`mt-3 h-14 items-center justify-center rounded-xl border border-red-500 ${
-                isDeleting ? "bg-red-50" : "bg-white active:bg-red-50"
-              }`}
-              onPress={handleDelete}
-              disabled={isDeleting}
-            >
-              {isDeleting ? (
-                <ActivityIndicator color="#EF4444" />
-              ) : (
-                <Text className="text-base font-semibold text-red-500">
-                  Delete Property
-                </Text>
-              )}
-            </Pressable>
-          </View>
-        )}
-      </View>
-    </ScrollView>
+      </Modal>
+    </>
   );
 };
 
