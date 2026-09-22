@@ -15,8 +15,8 @@
       "package": "com.kribb.app",
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
-        "foregroundImage": "./assets/images/kribb-monochrome.png",
-        "monochromeImage": "./assets/images/kribb-monochrome.png"
+        "foregroundImage": "./assets/images/kribb-adaptive-icon.png",
+        "monochromeImage": "./assets/images/kribb-adaptive-icon.png"
       },
       "predictiveBackGestureEnabled": false
     },

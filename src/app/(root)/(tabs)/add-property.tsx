@@ -437,6 +437,7 @@ const AddProperty = () => {
           value={title}
           onChangeText={setTitle}
           placeholder="e.g. Beautiful 2BHK Apartment"
+          placeholderTextColor="#94A3B8"
           className="h-14 rounded-xl border border-slate-300 px-4 text-base text-slate-900"
         />
       </View>
@@ -452,6 +453,7 @@ const AddProperty = () => {
           value={description}
           onChangeText={setDescription}
           placeholder="Describe the property..."
+          placeholderTextColor="#94A3B8"
           multiline
           textAlignVertical="top"
           className="min-h-28 rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-900"
@@ -467,6 +469,7 @@ const AddProperty = () => {
           value={price}
           onChangeText={setPrice}
           placeholder="e.g. 5000000"
+          placeholderTextColor="#94A3B8"
           keyboardType="numeric"
           className="h-14 rounded-xl border border-slate-300 px-4 text-base text-slate-900"
         />
@@ -512,6 +515,8 @@ const AddProperty = () => {
         <TextInput
           value={bedrooms}
           onChangeText={setBedrooms}
+          placeholder="At least 1"
+          placeholderTextColor="#94A3B8"
           keyboardType="numeric"
           className="h-14 rounded-xl border border-slate-300 px-4 text-base text-slate-900"
         />
@@ -527,6 +532,8 @@ const AddProperty = () => {
         <TextInput
           value={bathrooms}
           onChangeText={setBathrooms}
+          placeholder="At least 1"
+          placeholderTextColor="#94A3B8"
           keyboardType="numeric"
           className="h-14 rounded-xl border border-slate-300 px-4 text-base text-slate-900"
         />
@@ -543,6 +550,7 @@ const AddProperty = () => {
           value={areaSqft}
           onChangeText={setAreaSqft}
           placeholder="e.g. 1200"
+          placeholderTextColor="#94A3B8"
           keyboardType="numeric"
           className="h-14 rounded-xl border border-slate-300 px-4 text-base text-slate-900"
         />
@@ -559,6 +567,7 @@ const AddProperty = () => {
           value={address}
           onChangeText={setAddress}
           placeholder="Full property address"
+          placeholderTextColor="#94A3B8"
           multiline
           textAlignVertical="top"
           className="min-h-20 rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-900"
@@ -574,6 +583,7 @@ const AddProperty = () => {
           value={city}
           onChangeText={setCity}
           placeholder="e.g. Hyderabad"
+          placeholderTextColor="#94A3B8"
           className="h-14 rounded-xl border border-slate-300 px-4 text-base text-slate-900"
         />
       </View>
@@ -589,6 +599,7 @@ const AddProperty = () => {
           value={latitude}
           onChangeText={setLatitude}
           placeholder="e.g. 17.3850"
+          placeholderTextColor="#94A3B8"
           keyboardType="decimal-pad"
           className="h-14 rounded-xl border border-slate-300 px-4 text-base text-slate-900"
         />
@@ -605,6 +616,7 @@ const AddProperty = () => {
           value={longitude}
           onChangeText={setLongitude}
           placeholder="e.g. 78.4867"
+          placeholderTextColor="#94A3B8"
           keyboardType="decimal-pad"
           className="h-14 rounded-xl border border-slate-300 px-4 text-base text-slate-900"
         />
