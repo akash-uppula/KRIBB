@@ -1,16 +1,18 @@
 {
   "expo": {
     "name": "KRIBB",
-    "slug": "KRIBB",
+    "slug": "kribb",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/kribb-icon.png",
     "scheme": "kribb",
     "userInterfaceStyle": "automatic",
     "ios": {
+      "bundleIdentifier": "com.kribb.app",
       "icon": "./assets/images/kribb-icon.png"
     },
     "android": {
+      "package": "com.kribb.app",
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/images/kribb-monochrome.png",
@@ -42,6 +44,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "80935a1a-55d0-4343-921a-b130de397d16"
+      }
     }
   }
 }
