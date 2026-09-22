@@ -39,7 +39,13 @@
       "expo-secure-store",
       "expo-sqlite",
       "expo-image",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "react-native-maps",
+        {
+          "androidGoogleMapsApiKey": "AIzaSyD8Sq8YAugBFw3Zth1UloYLi1jVjeoWwrg"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
