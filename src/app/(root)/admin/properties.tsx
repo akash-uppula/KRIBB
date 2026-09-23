@@ -1,6 +1,6 @@
 import { useUser } from "@clerk/expo";
-import { router } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -82,19 +82,29 @@ const AdminProperties = () => {
     setProperties((data ?? []) as Property[]);
   }, [supabase]);
 
-  useEffect(() => {
-    const load = async () => {
-      const admin = await checkAdmin();
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
 
-      if (admin) {
-        await fetchProperties();
-      }
+      const load = async () => {
+        const admin = await checkAdmin();
 
-      setIsLoading(false);
-    };
+        if (admin) {
+          await fetchProperties();
+        }
 
-    load();
-  }, [checkAdmin, fetchProperties]);
+        if (isActive) {
+          setIsLoading(false);
+        }
+      };
+
+      load();
+
+      return () => {
+        isActive = false;
+      };
+    }, [checkAdmin, fetchProperties]),
+  );
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
