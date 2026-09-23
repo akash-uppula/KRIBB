@@ -31,7 +31,7 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#FFFFFF",
-          "image": "./assets/images/kribb-splash.png",
+          "image": "./assets/images/kribb-splash-icon.png",
           "imageWidth": 280
         }
       ],
@@ -43,7 +43,7 @@
       [
         "react-native-maps",
         {
-          "androidGoogleMapsApiKey": "AIzaSyD8Sq8YAugBFw3Zth1UloYLi1jVjeoWwrg"
+          "androidGoogleMapsApiKey": "AIzaSyBRb150gSy6QXCNbtNIl_OThVbRTOl0rPg"
         }
       ]
     ],

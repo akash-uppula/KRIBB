@@ -209,23 +209,26 @@ Thank you.`;
       `?subject=${encodeURIComponent(subject)}` +
       `&body=${encodeURIComponent(body)}`;
 
+    const gmailUrl =
+      `https://mail.google.com/mail/?view=cm&fs=1` +
+      `&to=${encodeURIComponent(ownerEmail)}` +
+      `&su=${encodeURIComponent(subject)}` +
+      `&body=${encodeURIComponent(body)}`;
+
     try {
-      const canOpen = await ExpoLinking.canOpenURL(mailUrl);
+      const canOpenMail = await ExpoLinking.canOpenURL(mailUrl);
 
-      if (!canOpen) {
-        Alert.alert(
-          "Email App Not Available",
-          "No email app is available on this device.",
-        );
-
+      if (canOpenMail) {
+        await ExpoLinking.openURL(mailUrl);
         return;
       }
 
-      await ExpoLinking.openURL(mailUrl);
+      await ExpoLinking.openURL(gmailUrl);
     } catch (error) {
-      console.log("Open email error:", error);
-
-      Alert.alert("Error", "Could not open the email app.");
+      Alert.alert(
+        "Unable to Contact Owner",
+        `Please email the owner directly at:\n\n${ownerEmail}`,
+      );
     }
   };
 
