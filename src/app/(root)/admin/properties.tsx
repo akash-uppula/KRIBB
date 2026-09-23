@@ -28,6 +28,8 @@ type Property = {
   created_at: string;
 };
 
+type Filter = "all" | "featured" | "available" | "sold";
+
 const AdminProperties = () => {
   const { user } = useUser();
   const supabase = useSupabase();
@@ -36,13 +38,15 @@ const AdminProperties = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-
-  const [searchText, setSearchText] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState("all");
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<Filter>("all");
 
   const checkAdmin = useCallback(async () => {
-    if (!user?.id) return false;
+    if (!user?.id) {
+      return false;
+    }
 
     const { data, error } = await supabase
       .from("profiles")
@@ -51,12 +55,12 @@ const AdminProperties = () => {
       .single();
 
     if (error) {
-      console.log("Admin check error:", error.message);
       setIsAdmin(false);
       return false;
     }
 
     const admin = data?.is_admin === true;
+
     setIsAdmin(admin);
 
     return admin;
@@ -71,7 +75,6 @@ const AdminProperties = () => {
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.log("Admin properties fetch error:", error.message);
       Alert.alert("Error", "Could not load properties.");
       return;
     }
@@ -105,6 +108,37 @@ const AdminProperties = () => {
     setIsRefreshing(false);
   };
 
+  const filteredProperties = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    return properties.filter((property) => {
+      const matchesSearch =
+        !query ||
+        property.title.toLowerCase().includes(query) ||
+        property.city.toLowerCase().includes(query) ||
+        property.address.toLowerCase().includes(query) ||
+        property.type.toLowerCase().includes(query);
+
+      if (!matchesSearch) {
+        return false;
+      }
+
+      if (filter === "featured" && !property.is_featured) {
+        return false;
+      }
+
+      if (filter === "available" && property.is_sold) {
+        return false;
+      }
+
+      if (filter === "sold" && !property.is_sold) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [properties, search, filter]);
+
   const toggleFeatured = (property: Property) => {
     const nextValue = !property.is_featured;
 
@@ -133,7 +167,6 @@ const AdminProperties = () => {
             setUpdatingId(null);
 
             if (error) {
-              console.log("Featured update error:", error.message);
               Alert.alert("Update Failed", error.message);
               return;
             }
@@ -154,48 +187,52 @@ const AdminProperties = () => {
     );
   };
 
-  const filteredProperties = useMemo(() => {
-    const search = searchText.trim().toLowerCase();
+  const deleteProperty = (property: Property) => {
+    Alert.alert(
+      "Delete Property?",
+      `Are you sure you want to permanently delete "${property.title}"?\n\nThis property will also be removed from all users' saved properties.`,
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            setDeletingId(property.id);
 
-    return properties.filter((property) => {
-      if (selectedStatus === "featured" && !property.is_featured) {
-        return false;
-      }
+            const { error } = await supabase
+              .from("properties")
+              .delete()
+              .eq("id", property.id);
 
-      if (selectedStatus === "available" && property.is_sold) {
-        return false;
-      }
+            setDeletingId(null);
 
-      if (selectedStatus === "sold" && !property.is_sold) {
-        return false;
-      }
+            if (error) {
+              Alert.alert("Delete Failed", error.message);
+              return;
+            }
 
-      if (!search) {
-        return true;
-      }
+            setProperties((current) =>
+              current.filter((item) => item.id !== property.id),
+            );
 
-      const searchableText = [
-        property.title,
-        property.city,
-        property.address,
-        property.type,
-      ]
-        .join(" ")
-        .toLowerCase();
-
-      return searchableText.includes(search);
-    });
-  }, [properties, searchText, selectedStatus]);
-
-  const clearFilters = () => {
-    setSearchText("");
-    setSelectedStatus("all");
+            Alert.alert(
+              "Property Deleted",
+              "The property and its saved-property records have been removed.",
+            );
+          },
+        },
+      ],
+    );
   };
 
   if (isLoading || isAdmin === null) {
     return (
       <View className="flex-1 items-center justify-center bg-white">
         <ActivityIndicator size="large" color="#2563EB" />
+
         <Text className="mt-3 text-sm text-slate-500">
           Loading admin properties...
         </Text>
@@ -239,72 +276,53 @@ const AdminProperties = () => {
       </Text>
 
       <Text className="mt-1 text-sm text-slate-500">
-        {filteredProperties.length}{" "}
-        {filteredProperties.length === 1 ? "property" : "properties"} found
+        {filteredProperties.length} of {properties.length} properties
       </Text>
 
-      {/* Search */}
-      <View className="mt-5 flex-row items-center rounded-xl border border-slate-200 bg-white px-4">
-        <Text className="mr-2 text-lg text-slate-400">⌕</Text>
+      <TextInput
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Search properties..."
+        placeholderTextColor="#94A3B8"
+        className="mt-5 h-14 rounded-xl border border-slate-200 bg-white px-4 text-base text-slate-900"
+      />
 
-        <TextInput
-          value={searchText}
-          onChangeText={setSearchText}
-          placeholder="Search title, city or address..."
-          placeholderTextColor="#94A3B8"
-          className="h-12 flex-1 text-sm text-slate-900"
-        />
-      </View>
-
-      {/* Status Filters */}
-      <View className="mt-4">
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{
-            gap: 8,
-          }}
-        >
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        className="mt-4"
+      >
+        <View className="flex-row gap-2">
           {[
-            { label: "All", value: "all" },
-            { label: "Featured", value: "featured" },
-            { label: "Available", value: "available" },
-            { label: "Sold", value: "sold" },
-          ].map((item) => (
-            <Pressable
-              key={item.value}
-              onPress={() => setSelectedStatus(item.value)}
-              className={`rounded-full border px-4 py-2.5 ${
-                selectedStatus === item.value
-                  ? "border-blue-600 bg-blue-600"
-                  : "border-slate-300 bg-white"
-              }`}
-            >
-              <Text
-                className={`font-medium ${
-                  selectedStatus === item.value
-                    ? "text-white"
-                    : "text-slate-700"
+            ["all", "All"],
+            ["featured", "Featured"],
+            ["available", "Available"],
+            ["sold", "Sold"],
+          ].map(([value, label]) => {
+            const selected = filter === value;
+
+            return (
+              <Pressable
+                key={value}
+                onPress={() => setFilter(value as Filter)}
+                className={`rounded-full border px-4 py-2 ${
+                  selected
+                    ? "border-blue-600 bg-blue-600"
+                    : "border-slate-300 bg-white"
                 }`}
               >
-                {item.label}
-              </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-      </View>
-
-      {/* Clear Filters */}
-      {(searchText || selectedStatus !== "all") && (
-        <Pressable
-          onPress={clearFilters}
-          className="mt-3 self-start rounded-lg px-2 py-1"
-        >
-          <Text className="text-sm font-semibold text-blue-600">
-            Clear Filters
-          </Text>
-        </Pressable>
-      )}
+                <Text
+                  className={`text-sm font-semibold ${
+                    selected ? "text-white" : "text-slate-600"
+                  }`}
+                >
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </ScrollView>
 
       {filteredProperties.length === 0 ? (
         <View className="mt-6 items-center rounded-2xl border border-slate-200 bg-white p-8">
@@ -313,22 +331,14 @@ const AdminProperties = () => {
           </Text>
 
           <Text className="mt-2 text-center text-sm text-slate-500">
-            Try changing your search or selected filter.
+            Try changing your search or filter.
           </Text>
-
-          {(searchText || selectedStatus !== "all") && (
-            <Pressable
-              onPress={clearFilters}
-              className="mt-5 rounded-xl bg-blue-600 px-5 py-3"
-            >
-              <Text className="font-semibold text-white">Clear Filters</Text>
-            </Pressable>
-          )}
         </View>
       ) : (
         <View className="mt-5 gap-5">
           {filteredProperties.map((property) => {
             const isUpdating = updatingId === property.id;
+            const isDeleting = deletingId === property.id;
 
             return (
               <View
@@ -389,31 +399,61 @@ const AdminProperties = () => {
                     </Text>
                   </View>
 
+                  <View className="mt-5 flex-row gap-3">
+                    <Pressable
+                      onPress={() =>
+                        router.push({
+                          pathname: "/admin/property-edit",
+                          params: {
+                            id: property.id,
+                          },
+                        })
+                      }
+                      className="flex-1 items-center rounded-xl border border-blue-600 bg-white py-3"
+                    >
+                      <Text className="font-semibold text-blue-600">Edit</Text>
+                    </Pressable>
+
+                    <Pressable
+                      disabled={isUpdating}
+                      onPress={() => toggleFeatured(property)}
+                      className={`flex-1 items-center rounded-xl py-3 ${
+                        property.is_featured
+                          ? "border border-yellow-300 bg-yellow-50"
+                          : "bg-blue-600"
+                      } ${isUpdating ? "opacity-60" : ""}`}
+                    >
+                      {isUpdating ? (
+                        <ActivityIndicator
+                          size="small"
+                          color={property.is_featured ? "#A16207" : "#FFFFFF"}
+                        />
+                      ) : (
+                        <Text
+                          className={`font-semibold ${
+                            property.is_featured
+                              ? "text-yellow-700"
+                              : "text-white"
+                          }`}
+                        >
+                          {property.is_featured ? "Unfeature" : "Feature"}
+                        </Text>
+                      )}
+                    </Pressable>
+                  </View>
+
                   <Pressable
-                    disabled={isUpdating}
-                    onPress={() => toggleFeatured(property)}
-                    className={`mt-5 items-center rounded-xl py-3 ${
-                      property.is_featured
-                        ? "border border-yellow-300 bg-yellow-50"
-                        : "bg-blue-600"
-                    } ${isUpdating ? "opacity-60" : ""}`}
+                    disabled={isDeleting}
+                    onPress={() => deleteProperty(property)}
+                    className={`mt-3 h-12 items-center justify-center rounded-xl border border-red-200 bg-red-50 ${
+                      isDeleting ? "opacity-60" : ""
+                    }`}
                   >
-                    {isUpdating ? (
-                      <ActivityIndicator
-                        size="small"
-                        color={property.is_featured ? "#A16207" : "#FFFFFF"}
-                      />
+                    {isDeleting ? (
+                      <ActivityIndicator size="small" color="#DC2626" />
                     ) : (
-                      <Text
-                        className={`font-semibold ${
-                          property.is_featured
-                            ? "text-yellow-700"
-                            : "text-white"
-                        }`}
-                      >
-                        {property.is_featured
-                          ? "Remove Featured"
-                          : "Set as Featured"}
+                      <Text className="font-semibold text-red-600">
+                        Delete Property
                       </Text>
                     )}
                   </Pressable>

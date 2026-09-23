@@ -21,6 +21,20 @@ const AdminLayout = () => {
           title: "Manage Properties",
         }}
       />
+
+      <Stack.Screen
+        name="property-edit"
+        options={{
+          title: "Edit Property",
+        }}
+      />
+
+      <Stack.Screen
+        name="users"
+        options={{
+          title: "Manage Users",
+        }}
+      />
     </Stack>
   );
 };
