@@ -1,4 +1,5 @@
 import { useSignIn } from "@clerk/expo";
+import { Ionicons } from "@expo/vector-icons";
 import { Link, useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -31,6 +32,7 @@ const SignIn = () => {
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
 
+  const [showPassword, setShowPassword] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [isVerifyingCode, setIsVerifyingCode] = useState(false);
@@ -226,6 +228,7 @@ const SignIn = () => {
     setErrors({});
     setEmail("");
     setPassword("");
+    setShowPassword(false);
   };
 
   const finalizeSignIn = async () => {
@@ -310,29 +313,48 @@ const SignIn = () => {
 
                 {/* Password */}
                 <View className="mt-4">
-                  <TextInput
-                    className={`h-14 rounded-xl border bg-white px-4 text-base text-slate-900 ${
+                  <View
+                    className={`h-14 flex-row items-center rounded-xl border bg-white ${
                       errors.password ? "border-red-500" : "border-slate-200"
                     }`}
-                    placeholder="Password"
-                    placeholderTextColor="#9CA3AF"
-                    value={password}
-                    onChangeText={(value) => {
-                      setPassword(value);
+                  >
+                    <TextInput
+                      className="h-14 flex-1 px-4 text-base text-slate-900"
+                      placeholder="Password"
+                      placeholderTextColor="#9CA3AF"
+                      value={password}
+                      onChangeText={(value) => {
+                        setPassword(value);
 
-                      if (errors.password) {
-                        setErrors((current) => ({
-                          ...current,
-                          password: undefined,
-                        }));
+                        if (errors.password) {
+                          setErrors((current) => ({
+                            ...current,
+                            password: undefined,
+                          }));
+                        }
+                      }}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      autoComplete="current-password"
+                      secureTextEntry={!showPassword}
+                      returnKeyType="done"
+                    />
+
+                    <Pressable
+                      className="h-14 w-14 items-center justify-center"
+                      onPress={() => setShowPassword((current) => !current)}
+                      accessibilityRole="button"
+                      accessibilityLabel={
+                        showPassword ? "Hide password" : "Show password"
                       }
-                    }}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    autoComplete="current-password"
-                    secureTextEntry
-                    returnKeyType="done"
-                  />
+                    >
+                      <Ionicons
+                        name={showPassword ? "eye-off-outline" : "eye-outline"}
+                        size={22}
+                        color="#64748B"
+                      />
+                    </Pressable>
+                  </View>
 
                   {errors.password && (
                     <Text className="mt-1.5 text-xs text-red-500">

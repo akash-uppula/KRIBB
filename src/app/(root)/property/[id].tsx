@@ -190,7 +190,6 @@ const PropertyDetails = () => {
         "Owner email unavailable",
         "The owner's email address is not available right now.",
       );
-
       return;
     }
 
@@ -209,24 +208,11 @@ Thank you.`;
       `?subject=${encodeURIComponent(subject)}` +
       `&body=${encodeURIComponent(body)}`;
 
-    const gmailUrl =
-      `https://mail.google.com/mail/?view=cm&fs=1` +
-      `&to=${encodeURIComponent(ownerEmail)}` +
-      `&su=${encodeURIComponent(subject)}` +
-      `&body=${encodeURIComponent(body)}`;
-
     try {
-      const canOpenMail = await ExpoLinking.canOpenURL(mailUrl);
-
-      if (canOpenMail) {
-        await ExpoLinking.openURL(mailUrl);
-        return;
-      }
-
-      await ExpoLinking.openURL(gmailUrl);
+      await ExpoLinking.openURL(mailUrl);
     } catch (error) {
       Alert.alert(
-        "Unable to Contact Owner",
+        "Unable to Open Email",
         `Please email the owner directly at:\n\n${ownerEmail}`,
       );
     }
